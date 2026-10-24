@@ -1,0 +1,13 @@
+bin/
+decision-cli
+*.db
+*.sock
+*.log
+nohup.out
+.DS_Store
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+TODO.md
+

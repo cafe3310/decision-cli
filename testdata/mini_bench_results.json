@@ -1,0 +1,552 @@
+{
+  "models": {
+    "qwen3-reranker-4b": {
+      "accuracy": "9/12 (75.0%)",
+      "correct_count": 9,
+      "total_cases": 12,
+      "cold_load_first_call_ms": 1450.1,
+      "avg_resident_infer_ms": 1399.96,
+      "avg_cache_hit_ms": 0.826,
+      "results": [
+        {
+          "id": "doc-01-api-guide",
+          "category": "A-文档诉求(显式正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 0.8676,
+          "margin": 1.8796,
+          "logit_yes": -0.3951,
+          "logit_no": -2.2747,
+          "infer_ms": 1381.352
+        },
+        {
+          "id": "doc-02-cookbook-request",
+          "category": "A-文档诉求(隐式教程正例)",
+          "expected": "是",
+          "decision": "否",
+          "correct": false,
+          "probability": 0.1116,
+          "margin": -2.0741,
+          "logit_yes": -2.4813,
+          "logit_no": -0.4072,
+          "infer_ms": 1443.524
+        },
+        {
+          "id": "doc-03-pure-praise-noise",
+          "category": "A-文档诉求(纯夸奖负例)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0.001,
+          "margin": -6.9555,
+          "logit_yes": -7.2676,
+          "logit_no": -0.3122,
+          "infer_ms": 1390.409
+        },
+        {
+          "id": "doc-04-weights-bug-trap",
+          "category": "A-文档诉求(近邻干扰：权重乱码报错而非文档缺失)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0.016,
+          "margin": -4.1191,
+          "logit_yes": -4.5036,
+          "logit_no": -0.3844,
+          "infer_ms": 1404.198
+        },
+        {
+          "id": "quant-05-gguf-mlx",
+          "category": "B-量化与终端适配(正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 0.8814,
+          "margin": 2.0059,
+          "logit_yes": -0.3608,
+          "logit_no": -2.3667,
+          "infer_ms": 1379.165
+        },
+        {
+          "id": "quant-06-llama-cpp-pr",
+          "category": "B-量化与终端适配(架构支持正例)",
+          "expected": "是",
+          "decision": "否",
+          "correct": false,
+          "probability": 0.3251,
+          "margin": -0.7303,
+          "logit_yes": -1.3857,
+          "logit_no": -0.6554,
+          "infer_ms": 1356.533
+        },
+        {
+          "id": "quant-07-cloud-api-rate-limit",
+          "category": "B-量化与终端适配(近邻干扰：云端API限流而非本地部署)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0.0001,
+          "margin": -9.726,
+          "logit_yes": -10.0312,
+          "logit_no": -0.3052,
+          "infer_ms": 1492.548
+        },
+        {
+          "id": "quant-08-finetune-lora",
+          "category": "B-量化与终端适配(近邻干扰：训练微调诉求)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0.0047,
+          "margin": -5.3589,
+          "logit_yes": -5.7634,
+          "logit_no": -0.4045,
+          "infer_ms": 1396.261
+        },
+        {
+          "id": "biz-09-bank-procurement",
+          "category": "C-商业与生态合作(企业采购正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 0.7782,
+          "margin": 1.2551,
+          "logit_yes": -0.4804,
+          "logit_no": -1.7355,
+          "infer_ms": 1382.171
+        },
+        {
+          "id": "biz-10-platform-integration",
+          "category": "C-商业与生态合作(平台集成正例)",
+          "expected": "是",
+          "decision": "否",
+          "correct": false,
+          "probability": 0.2481,
+          "margin": -1.1087,
+          "logit_yes": -1.6414,
+          "logit_no": -0.5327,
+          "infer_ms": 1392.771
+        },
+        {
+          "id": "biz-11-individual-question",
+          "category": "C-商业与生态合作(个人开发者普通提问负例)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0.0008,
+          "margin": -7.0767,
+          "logit_yes": -7.4511,
+          "logit_no": -0.3745,
+          "infer_ms": 1420.435
+        },
+        {
+          "id": "biz-12-competitor-comparison",
+          "category": "C-商业与生态合作(技术横评负例)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0.0006,
+          "margin": -7.4665,
+          "logit_yes": -7.7871,
+          "logit_no": -0.3206,
+          "infer_ms": 1360.178
+        }
+      ]
+    },
+    "gemma-4-e4b": {
+      "accuracy": "11/12 (91.7%)",
+      "correct_count": 11,
+      "total_cases": 12,
+      "cold_load_first_call_ms": 3141.8,
+      "avg_resident_infer_ms": 1457.8,
+      "avg_cache_hit_ms": 1.458,
+      "results": [
+        {
+          "id": "doc-01-api-guide",
+          "category": "A-文档诉求(显式正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 1,
+          "margin": 11.75,
+          "logit_yes": 0,
+          "logit_no": -11.75,
+          "infer_ms": 1452.745
+        },
+        {
+          "id": "doc-02-cookbook-request",
+          "category": "A-文档诉求(隐式教程正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 1,
+          "margin": 12.3125,
+          "logit_yes": 0,
+          "logit_no": -12.3125,
+          "infer_ms": 1707.89
+        },
+        {
+          "id": "doc-03-pure-praise-noise",
+          "category": "A-文档诉求(纯夸奖负例)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0,
+          "margin": -10.5,
+          "logit_yes": -10.5,
+          "logit_no": 0,
+          "infer_ms": 1468.28
+        },
+        {
+          "id": "doc-04-weights-bug-trap",
+          "category": "A-文档诉求(近邻干扰：权重乱码报错而非文档缺失)",
+          "expected": "否",
+          "decision": "是",
+          "correct": false,
+          "probability": 0.9998,
+          "margin": 8.5,
+          "logit_yes": -0.0002,
+          "logit_no": -8.5002,
+          "infer_ms": 1467.059
+        },
+        {
+          "id": "quant-05-gguf-mlx",
+          "category": "B-量化与终端适配(正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 1,
+          "margin": 14.875,
+          "logit_yes": 0,
+          "logit_no": -14.875,
+          "infer_ms": 1409.238
+        },
+        {
+          "id": "quant-06-llama-cpp-pr",
+          "category": "B-量化与终端适配(架构支持正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 1,
+          "margin": 12.8125,
+          "logit_yes": 0,
+          "logit_no": -12.8125,
+          "infer_ms": 1466.236
+        },
+        {
+          "id": "quant-07-cloud-api-rate-limit",
+          "category": "B-量化与终端适配(近邻干扰：云端API限流而非本地部署)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0,
+          "margin": -13,
+          "logit_yes": -13.0001,
+          "logit_no": -0.0001,
+          "infer_ms": 1533.622
+        },
+        {
+          "id": "quant-08-finetune-lora",
+          "category": "B-量化与终端适配(近邻干扰：训练微调诉求)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0.0086,
+          "margin": -4.75,
+          "logit_yes": -4.7587,
+          "logit_no": -0.0087,
+          "infer_ms": 1488.43
+        },
+        {
+          "id": "biz-09-bank-procurement",
+          "category": "C-商业与生态合作(企业采购正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 1,
+          "margin": 11.4375,
+          "logit_yes": 0,
+          "logit_no": -11.4375,
+          "infer_ms": 1396.171
+        },
+        {
+          "id": "biz-10-platform-integration",
+          "category": "C-商业与生态合作(平台集成正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 0.9999,
+          "margin": 9.75,
+          "logit_yes": -0.0001,
+          "logit_no": -9.7501,
+          "infer_ms": 1397.791
+        },
+        {
+          "id": "biz-11-individual-question",
+          "category": "C-商业与生态合作(个人开发者普通提问负例)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0,
+          "margin": -12.1875,
+          "logit_yes": -12.1875,
+          "logit_no": 0,
+          "infer_ms": 1377.484
+        },
+        {
+          "id": "biz-12-competitor-comparison",
+          "category": "C-商业与生态合作(技术横评负例)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0,
+          "margin": -13,
+          "logit_yes": -13,
+          "logit_no": 0,
+          "infer_ms": 1328.671
+        }
+      ]
+    },
+    "gemma-4-26b-a4b": {
+      "accuracy": "12/12 (100.0%)",
+      "correct_count": 12,
+      "total_cases": 12,
+      "cold_load_first_call_ms": 7591.1,
+      "avg_resident_infer_ms": 1567.93,
+      "avg_cache_hit_ms": 0.974,
+      "results": [
+        {
+          "id": "doc-01-api-guide",
+          "category": "A-文档诉求(显式正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 1,
+          "margin": 16.8295,
+          "logit_yes": 0,
+          "logit_no": -16.8295,
+          "infer_ms": 1809.788
+        },
+        {
+          "id": "doc-02-cookbook-request",
+          "category": "A-文档诉求(隐式教程正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 1,
+          "margin": 15.0698,
+          "logit_yes": 0,
+          "logit_no": -15.0698,
+          "infer_ms": 1522.891
+        },
+        {
+          "id": "doc-03-pure-praise-noise",
+          "category": "A-文档诉求(纯夸奖负例)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0,
+          "margin": -23.4993,
+          "logit_yes": -23.4993,
+          "logit_no": 0,
+          "infer_ms": 1408.265
+        },
+        {
+          "id": "doc-04-weights-bug-trap",
+          "category": "A-文档诉求(近邻干扰：权重乱码报错而非文档缺失)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0.0331,
+          "margin": -3.375,
+          "logit_yes": -3.4086,
+          "logit_no": -0.0336,
+          "infer_ms": 1434.089
+        },
+        {
+          "id": "quant-05-gguf-mlx",
+          "category": "B-量化与终端适配(正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 1,
+          "margin": 18.2315,
+          "logit_yes": 0,
+          "logit_no": -18.2315,
+          "infer_ms": 1635.999
+        },
+        {
+          "id": "quant-06-llama-cpp-pr",
+          "category": "B-量化与终端适配(架构支持正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 1,
+          "margin": 13.7187,
+          "logit_yes": 0,
+          "logit_no": -13.7187,
+          "infer_ms": 1560.622
+        },
+        {
+          "id": "quant-07-cloud-api-rate-limit",
+          "category": "B-量化与终端适配(近邻干扰：云端API限流而非本地部署)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0,
+          "margin": -23.1873,
+          "logit_yes": -23.1873,
+          "logit_no": 0,
+          "infer_ms": 1595.119
+        },
+        {
+          "id": "quant-08-finetune-lora",
+          "category": "B-量化与终端适配(近邻干扰：训练微调诉求)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0,
+          "margin": -21.1325,
+          "logit_yes": -21.1325,
+          "logit_no": 0,
+          "infer_ms": 1730.528
+        },
+        {
+          "id": "biz-09-bank-procurement",
+          "category": "C-商业与生态合作(企业采购正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 1,
+          "margin": 16.7724,
+          "logit_yes": 0,
+          "logit_no": -16.7724,
+          "infer_ms": 1616.998
+        },
+        {
+          "id": "biz-10-platform-integration",
+          "category": "C-商业与生态合作(平台集成正例)",
+          "expected": "是",
+          "decision": "是",
+          "correct": true,
+          "probability": 1,
+          "margin": 12.125,
+          "logit_yes": 0,
+          "logit_no": -12.125,
+          "infer_ms": 1486.465
+        },
+        {
+          "id": "biz-11-individual-question",
+          "category": "C-商业与生态合作(个人开发者普通提问负例)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0,
+          "margin": -22.8121,
+          "logit_yes": -22.8121,
+          "logit_no": 0,
+          "infer_ms": 1440.043
+        },
+        {
+          "id": "biz-12-competitor-comparison",
+          "category": "C-商业与生态合作(技术横评负例)",
+          "expected": "否",
+          "decision": "否",
+          "correct": true,
+          "probability": 0,
+          "margin": -22.6404,
+          "logit_yes": -22.6404,
+          "logit_no": 0,
+          "infer_ms": 1574.382
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "doc-01-api-guide",
+      "rubrics": "判断这些文本是否代表文档开发、API说明、教程或接入指南相关的需求",
+      "expected": "是",
+      "category": "A-文档诉求(显式正例)",
+      "context": "用户表达：README 里面只有模型权重下载链接，缺少 vLLM 和 SGLang 的启动参数说明和 API 调用示例。建议动作：补充推理框架部署文档与 OpenAI 兼容接口调用示例。"
+    },
+    {
+      "id": "doc-02-cookbook-request",
+      "rubrics": "判断这些文本是否代表文档开发、API说明、教程或接入指南相关的需求",
+      "expected": "是",
+      "category": "A-文档诉求(隐式教程正例)",
+      "context": "用户表达：想在开发板上跑 Ling-3.0-tiny，但不知道怎么配环境和量化参数，官方能不能出一个从零开始的图文部署案例或者 Cookbook？"
+    },
+    {
+      "id": "doc-03-pure-praise-noise",
+      "rubrics": "判断这些文本是否代表文档开发、API说明、教程或接入指南相关的需求",
+      "expected": "否",
+      "category": "A-文档诉求(纯夸奖负例)",
+      "context": "用户表达：这模型实在太快了！家用的 8G 显卡开 128k 上下文能跑 100 多 token/s，完美平替 gemini flash！"
+    },
+    {
+      "id": "doc-04-weights-bug-trap",
+      "rubrics": "判断这些文本是否代表文档开发、API说明、教程或接入指南相关的需求",
+      "expected": "否",
+      "category": "A-文档诉求(近邻干扰：权重乱码报错而非文档缺失)",
+      "context": "用户表达：按照官方教程拉起模型后，生成长代码时经常出现中英文夹杂乱码，而且 MTP 开启后 thinking 标签格式不对。"
+    },
+    {
+      "id": "quant-05-gguf-mlx",
+      "rubrics": "判断这些文本是否代表本地量化权重（GGUF/MLX/AWQ/FP8）或终端推理工具（Ollama/LM Studio/llama.cpp）适配的需求",
+      "expected": "是",
+      "category": "B-量化与终端适配(正例)",
+      "context": "用户表达：开发者询问何时发布 Ling-3.1-flash 的 GGUF 和 Apple Silicon MLX 4-bit 量化版本，以便在 Mac Studio 和 Ollama 上本地运行。"
+    },
+    {
+      "id": "quant-06-llama-cpp-pr",
+      "rubrics": "判断这些文本是否代表本地量化权重（GGUF/MLX/AWQ/FP8）或终端推理工具（Ollama/LM Studio/llama.cpp）适配的需求",
+      "expected": "是",
+      "category": "B-量化与终端适配(架构支持正例)",
+      "context": "用户表达：目前 llama.cpp 还没有合并 BailingMoeV2 架构的 PR，导致无法直接转换 GGUF 在本地 CPU+GPU 混合推理。"
+    },
+    {
+      "id": "quant-07-cloud-api-rate-limit",
+      "rubrics": "判断这些文本是否代表本地量化权重（GGUF/MLX/AWQ/FP8）或终端推理工具（Ollama/LM Studio/llama.cpp）适配的需求",
+      "expected": "否",
+      "category": "B-量化与终端适配(近邻干扰：云端API限流而非本地部署)",
+      "context": "用户表达：在 ZenMux 平台上调用在线免费 API 时频繁遇到 429 Rate Limit 报错，希望提高并发配额。"
+    },
+    {
+      "id": "quant-08-finetune-lora",
+      "rubrics": "判断这些文本是否代表本地量化权重（GGUF/MLX/AWQ/FP8）或终端推理工具（Ollama/LM Studio/llama.cpp）适配的需求",
+      "expected": "否",
+      "category": "B-量化与终端适配(近邻干扰：训练微调诉求)",
+      "context": "用户表达：询问 LLaMA-Factory 什么时候支持 Ling-3.0 的 LoRA 微调训练脚本。"
+    },
+    {
+      "id": "biz-09-bank-procurement",
+      "rubrics": "判断这些文本是否包含商业采购、企业私有化落地合作或第三方平台生态集成意向",
+      "expected": "是",
+      "category": "C-商业与生态合作(企业采购正例)",
+      "context": "用户表达：某欧洲金融机构架构师发来邮件，希望评估 Ling-3.0-flash-fin 在合规投研场景的私有化授权费用与 SLA 保障方案。"
+    },
+    {
+      "id": "biz-10-platform-integration",
+      "rubrics": "判断这些文本是否包含商业采购、企业私有化落地合作或第三方平台生态集成意向",
+      "expected": "是",
+      "category": "C-商业与生态合作(平台集成正例)",
+      "context": "用户表达：OpenRouter 与 KiloCode 团队询问能否作为 Day-0 合作伙伴接入 Ling-3.1-flash 官方 API 节点并联合宣发。"
+    },
+    {
+      "id": "biz-11-individual-question",
+      "rubrics": "判断这些文本是否包含商业采购、企业私有化落地合作或第三方平台生态集成意向",
+      "expected": "否",
+      "category": "C-商业与生态合作(个人开发者普通提问负例)",
+      "context": "用户表达：普通学生在微信群里问这个模型的 Apache 2.0 开源协议能不能用于毕业设计比赛。"
+    },
+    {
+      "id": "biz-12-competitor-comparison",
+      "rubrics": "判断这些文本是否包含商业采购、企业私有化落地合作或第三方平台生态集成意向",
+      "expected": "否",
+      "category": "C-商业与生态合作(技术横评负例)",
+      "context": "用户表达：社区用户对比了 Ling-3.0-tiny 和 Qwen3.5-27B 在代码补全上的表现，认为小尺寸 MoE 在速度上有明显优势但复杂推理稍弱。"
+    }
+  ]
+}

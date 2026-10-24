@@ -1,0 +1,250 @@
+{
+  "tasks": {
+    "boolq": {
+      "Jev-1.13.0 (API)": {
+        "sample_acc": 0.9333,
+        "sample_brier": 0.087,
+        "sample_ece": 0.12,
+        "full_test_acc": 0.917,
+        "full_test_ece": 0.0211,
+        "avg_latency_ms": 187.3
+      },
+      "Gemma-4-12B (Official Tier0)": {
+        "full_test_acc": 0.88,
+        "full_test_ece": 0.0337
+      },
+      "gemma-4-26b-a4b": {
+        "sample_acc": 0.8667,
+        "sample_brier": 0.1305,
+        "sample_ece": 0.136,
+        "steady_latency_ms": 535.5,
+        "batch_wall_ms": 22277.0
+      },
+      "gemma-4-e4b": {
+        "sample_acc": 0.8667,
+        "sample_brier": 0.1236,
+        "sample_ece": 0.1269,
+        "steady_latency_ms": 427.3,
+        "batch_wall_ms": 22329.0
+      },
+      "qwen3-reranker-4b": {
+        "sample_acc": 0.4667,
+        "sample_brier": 0.3627,
+        "sample_ece": 0.3227,
+        "steady_latency_ms": 354.2,
+        "batch_wall_ms": 20750.0
+      }
+    },
+    "fever_evidence": {
+      "Jev-1.13.0 (API)": {
+        "sample_acc": 0.9667,
+        "sample_brier": 0.0247,
+        "sample_ece": 0.0747,
+        "full_test_acc": 0.972,
+        "full_test_ece": 0.0279,
+        "avg_latency_ms": 201.2
+      },
+      "Gemma-4-12B (Official Tier0)": {
+        "full_test_acc": 0.953,
+        "full_test_ece": 0.103
+      },
+      "gemma-4-26b-a4b": {
+        "sample_acc": 1.0,
+        "sample_brier": 0.0001,
+        "sample_ece": 0.0027,
+        "steady_latency_ms": 416.2,
+        "batch_wall_ms": 14638.0
+      },
+      "gemma-4-e4b": {
+        "sample_acc": 0.9333,
+        "sample_brier": 0.0771,
+        "sample_ece": 0.0895,
+        "steady_latency_ms": 287.2,
+        "batch_wall_ms": 10966.0
+      },
+      "qwen3-reranker-4b": {
+        "sample_acc": 0.7,
+        "sample_brier": 0.1928,
+        "sample_ece": 0.0846,
+        "steady_latency_ms": 249.1,
+        "batch_wall_ms": 9692.0
+      }
+    },
+    "civil_comments": {
+      "Jev-1.13.0 (API)": {
+        "sample_acc": 0.6667,
+        "sample_brier": 0.2084,
+        "sample_ece": 0.1887,
+        "full_test_acc": 0.7285,
+        "full_test_ece": 0.0446,
+        "avg_latency_ms": 186.3
+      },
+      "Gemma-4-12B (Official Tier0)": {
+        "full_test_acc": 0.8255,
+        "full_test_ece": 0.0492
+      },
+      "gemma-4-26b-a4b": {
+        "sample_acc": 0.8333,
+        "sample_brier": 0.1497,
+        "sample_ece": 0.1435,
+        "steady_latency_ms": 434.0,
+        "batch_wall_ms": 15184.0
+      },
+      "gemma-4-e4b": {
+        "sample_acc": 0.7,
+        "sample_brier": 0.2781,
+        "sample_ece": 0.2952,
+        "steady_latency_ms": 270.8,
+        "batch_wall_ms": 9955.0
+      },
+      "qwen3-reranker-4b": {
+        "sample_acc": 0.9333,
+        "sample_brier": 0.0589,
+        "sample_ece": 0.0333,
+        "steady_latency_ms": 321.6,
+        "batch_wall_ms": 11382.0
+      }
+    },
+    "sms_spam": {
+      "Jev-1.13.0 (API)": {
+        "sample_acc": 0.9667,
+        "sample_brier": 0.0342,
+        "sample_ece": 0.1133,
+        "full_test_acc": 0.965,
+        "full_test_ece": 0.068,
+        "avg_latency_ms": 191.1
+      },
+      "Gemma-4-12B (Official Tier0)": {
+        "full_test_acc": 0.9287,
+        "full_test_ece": 0.0542
+      },
+      "gemma-4-26b-a4b": {
+        "sample_acc": 0.9667,
+        "sample_brier": 0.0328,
+        "sample_ece": 0.0331,
+        "steady_latency_ms": 342.6,
+        "batch_wall_ms": 13066.0
+      },
+      "gemma-4-e4b": {
+        "sample_acc": 0.9333,
+        "sample_brier": 0.0711,
+        "sample_ece": 0.0828,
+        "steady_latency_ms": 186.9,
+        "batch_wall_ms": 7459.0
+      },
+      "qwen3-reranker-4b": {
+        "sample_acc": 0.8333,
+        "sample_brier": 0.0902,
+        "sample_ece": 0.1185,
+        "steady_latency_ms": 194.0,
+        "batch_wall_ms": 7728.0
+      }
+    },
+    "paws": {
+      "Jev-1.13.0 (API)": {
+        "sample_acc": 0.9,
+        "sample_brier": 0.0836,
+        "sample_ece": 0.0323,
+        "full_test_acc": 0.846,
+        "full_test_ece": 0.04,
+        "avg_latency_ms": 196.0
+      },
+      "Gemma-4-12B (Official Tier0)": {
+        "full_test_acc": 0.813,
+        "full_test_ece": 0.0493
+      },
+      "gemma-4-26b-a4b": {
+        "sample_acc": 0.8,
+        "sample_brier": 0.1667,
+        "sample_ece": 0.1739,
+        "steady_latency_ms": 378.8,
+        "batch_wall_ms": 14224.0
+      },
+      "gemma-4-e4b": {
+        "sample_acc": 0.7667,
+        "sample_brier": 0.2285,
+        "sample_ece": 0.2247,
+        "steady_latency_ms": 221.1,
+        "batch_wall_ms": 8506.0
+      },
+      "qwen3-reranker-4b": {
+        "sample_acc": 0.6,
+        "sample_brier": 0.2495,
+        "sample_ece": 0.2067,
+        "steady_latency_ms": 203.9,
+        "batch_wall_ms": 7930.0
+      }
+    },
+    "strategyqa_closed": {
+      "Jev-1.13.0 (API)": {
+        "sample_acc": 0.7667,
+        "sample_brier": 0.1739,
+        "sample_ece": 0.1167,
+        "full_test_acc": 0.7846,
+        "full_test_ece": 0.0418,
+        "avg_latency_ms": 197.8
+      },
+      "Gemma-4-12B (Official Tier0)": {
+        "full_test_acc": 0.687,
+        "full_test_ece": 0.1165
+      },
+      "gemma-4-26b-a4b": {
+        "sample_acc": 0.3333,
+        "sample_brier": 0.612,
+        "sample_ece": 0.6441,
+        "steady_latency_ms": 327.5,
+        "batch_wall_ms": 12380.0
+      },
+      "gemma-4-e4b": {
+        "sample_acc": 0.5667,
+        "sample_brier": 0.3973,
+        "sample_ece": 0.4149,
+        "steady_latency_ms": 192.8,
+        "batch_wall_ms": 7536.0
+      },
+      "qwen3-reranker-4b": {
+        "sample_acc": 0.3,
+        "sample_brier": 0.6831,
+        "sample_ece": 0.6875,
+        "steady_latency_ms": 165.9,
+        "batch_wall_ms": 6969.0
+      }
+    },
+    "strategyqa_grounded": {
+      "Jev-1.13.0 (API)": {
+        "sample_acc": 0.9,
+        "sample_brier": 0.0648,
+        "sample_ece": 0.0633,
+        "full_test_acc": 0.9563,
+        "full_test_ece": 0.0586,
+        "avg_latency_ms": 187.8
+      },
+      "Gemma-4-12B (Official Tier0)": {
+        "full_test_acc": 0.8952,
+        "full_test_ece": 0.0315
+      },
+      "gemma-4-26b-a4b": {
+        "sample_acc": 0.6333,
+        "sample_brier": 0.3183,
+        "sample_ece": 0.3303,
+        "steady_latency_ms": 422.2,
+        "batch_wall_ms": 15280.0
+      },
+      "gemma-4-e4b": {
+        "sample_acc": 0.8,
+        "sample_brier": 0.1896,
+        "sample_ece": 0.1875,
+        "steady_latency_ms": 254.8,
+        "batch_wall_ms": 9550.0
+      },
+      "qwen3-reranker-4b": {
+        "sample_acc": 0.4,
+        "sample_brier": 0.3971,
+        "sample_ece": 0.3587,
+        "steady_latency_ms": 192.0,
+        "batch_wall_ms": 7570.0
+      }
+    }
+  },
+  "macro": {}
+}
