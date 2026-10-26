@@ -37,36 +37,63 @@ func DefaultRegistry() map[string]types.ModelSpec {
 			Alias:                  "qwen3-reranker-4b",
 			HFRepoID:               "mlx-community/Qwen3-Reranker-4B-4bit",
 			PromptStyle:            "qwen3-reranker",
+			SupportsVision:         false,
 			PositiveTokens:         []string{"yes", "Yes", "YES", "是"},
 			NegativeTokens:         []string{"no", "No", "NO", "否"},
 			CalibrationTemperature: 1.0,
+			ChoiceTemperature:      3.5,
+			ScoreTemperature:       2.5,
 			DefaultThreshold:       0.5,
 			ApproxMemoryGB:         2.5,
-			Description:            "Qwen3-Reranker-4B (4-bit MLX) — Cross-Encoder Pointwise Rubric Scorer",
+			Description:            "Qwen3-Reranker-4B (4-bit MLX) — Cross-Encoder Pointwise Rubric Scorer (Text Only)",
 		},
 		"gemma-4-26b-a4b": {
 			Alias:                  "gemma-4-26b-a4b",
 			HFRepoID:               "mlx-community/gemma-4-26b-a4b-it-4bit",
 			PromptStyle:            "gemma4-binary",
+			SupportsVision:         true,
 			PositiveTokens:         []string{"是", "Yes", "yes", "YES"},
 			NegativeTokens:         []string{"否", "No", "no", "NO"},
 			CalibrationTemperature: 4.5,
+			ChoiceTemperature:      3.5,
+			ScoreTemperature:       1.0,
 			DefaultThreshold:       0.5,
-			ApproxMemoryGB:         14.8,
-			Description:            "Gemma-4-26B-A4B-it (4-bit MLX MoE, 3.8B active) — High-Precision Rubric Judge",
+			ApproxMemoryGB:         15.3,
+			Description:            "Gemma-4-26B-A4B-it (4-bit MLX MoE + Vision, 3.8B active) — Multimodal High-Precision Judge",
 		},
 		"gemma-4-e4b": {
 			Alias:                  "gemma-4-e4b",
 			HFRepoID:               "mlx-community/gemma-4-e4b-it-4bit",
 			PromptStyle:            "gemma4-binary",
+			SupportsVision:         true,
 			PositiveTokens:         []string{"是", "Yes", "yes", "YES"},
 			NegativeTokens:         []string{"否", "No", "no", "NO"},
 			CalibrationTemperature: 3.5,
+			ChoiceTemperature:      3.5,
+			ScoreTemperature:       1.5,
 			DefaultThreshold:       0.5,
-			ApproxMemoryGB:         3.2,
-			Description:            "Gemma-4-E4B-it (4-bit MLX Dense) — Ultra-Fast Lightweight Judge",
+			ApproxMemoryGB:         3.5,
+			Description:            "Gemma-4-E4B-it (4-bit MLX Dense + Vision) — Multimodal Ultra-Fast Lightweight Judge",
 		},
 	}
+}
+
+// EffectivePrimitiveTemperature resolves the temperature for a specific primitive ("noul", "choice", "score").
+func EffectivePrimitiveTemperature(cfg *types.AppConfig, spec types.ModelSpec, primitive string, flagVal float64, flagChanged bool) float64 {
+	if flagChanged && flagVal > 0 {
+		return flagVal
+	}
+	switch primitive {
+	case "choice":
+		if spec.ChoiceTemperature > 0 {
+			return spec.ChoiceTemperature
+		}
+	case "score":
+		if spec.ScoreTemperature > 0 {
+			return spec.ScoreTemperature
+		}
+	}
+	return EffectiveTemperature(cfg, spec, flagVal, flagChanged)
 }
 
 // EffectiveTemperature resolves the temperature to use for a given model:
@@ -143,7 +170,8 @@ func DefaultConfigYAMLTemplate() string {
 	return `# decision-cli Global Configuration File
 # Auto-generated on first run. Modify as needed; CLI flags take precedence over this file.
 
-# Default model alias ("gemma-4-26b-a4b", "gemma-4-e4b", or "qwen3-reranker-4b")
+# Default model alias ("gemma-4-26b-a4b" is strongly recommended for largest world knowledge & accuracy;
+# alternatives: "gemma-4-e4b", "qwen3-reranker-4b")
 default_model: "gemma-4-26b-a4b"
 default_threshold: 0.5
 
@@ -152,8 +180,8 @@ default_temperature: 1.0
 
 # 1. Runtime & MLX Environment Configuration
 runtime:
-  # Custom Python virtual environment directory containing mlx and mlx-lm.
-  # If ~/.cache/decision-cli/venv does not exist, decision-cli also checks system/workspace MLX venvs.
+  # Self-contained Python virtual environment directory containing mlx, mlx-lm, and pillow.
+  # Automatically provisioned via uv on first run if missing.
   venv_dir: "~/.cache/decision-cli/venv"
 
   # Optional: explicit path to a python3 executable that has mlx and mlx-lm installed.
@@ -183,9 +211,9 @@ models:
   # Explicit mapping: model-name -> absolute directory path containing model.safetensors & config.json.
   # Takes highest priority over scan_dirs when non-empty.
   paths:
-    qwen3-reranker-4b: ""
     gemma-4-26b-a4b: ""
     gemma-4-e4b: ""
+    qwen3-reranker-4b: ""
 
   # Automatic scan directories searched in order when models.paths[model-name] is empty.
   # Supports both HuggingFace Hub cache structure (models--org--repo/snapshots/<hash>)
@@ -195,18 +223,8 @@ models:
     - "~/models"
     - "~/.lmstudio/models"
 
-  # Model registry metadata, positive/negative tokens, and per-model calibration_temperature
+  # Model registry metadata, positive/negative tokens, and per-model calibration temperatures
   registry:
-    qwen3-reranker-4b:
-      alias: "qwen3-reranker-4b"
-      hf_repo_id: "mlx-community/Qwen3-Reranker-4B-4bit"
-      prompt_style: "qwen3-reranker"
-      positive_tokens: ["yes", "Yes", "YES", "是"]
-      negative_tokens: ["no", "No", "NO", "否"]
-      calibration_temperature: 1.0
-      default_threshold: 0.5
-      approx_memory_gb: 2.5
-      description: "Qwen3-Reranker-4B (4-bit MLX) — Cross-Encoder Pointwise Rubric Scorer"
     gemma-4-26b-a4b:
       alias: "gemma-4-26b-a4b"
       hf_repo_id: "mlx-community/gemma-4-26b-a4b-it-4bit"
@@ -214,9 +232,11 @@ models:
       positive_tokens: ["是", "Yes", "yes", "YES"]
       negative_tokens: ["否", "No", "no", "NO"]
       calibration_temperature: 4.5
+      choice_temperature: 3.5
+      score_temperature: 1.0
       default_threshold: 0.5
       approx_memory_gb: 14.8
-      description: "Gemma-4-26B-A4B-it (4-bit MLX MoE, 3.8B active) — High-Precision Rubric Judge"
+      description: "Gemma-4-26B-A4B-it (4-bit MLX MoE, 3.8B active) — Default & Recommended Best Judge"
     gemma-4-e4b:
       alias: "gemma-4-e4b"
       hf_repo_id: "mlx-community/gemma-4-e4b-it-4bit"
@@ -224,9 +244,23 @@ models:
       positive_tokens: ["是", "Yes", "yes", "YES"]
       negative_tokens: ["否", "No", "no", "NO"]
       calibration_temperature: 3.5
+      choice_temperature: 3.5
+      score_temperature: 1.5
       default_threshold: 0.5
       approx_memory_gb: 3.2
-      description: "Gemma-4-E4B-it (4-bit MLX Dense) — Ultra-Fast Lightweight Judge"
+      description: "Gemma-4-E4B-it (4-bit MLX Dense) — Lightweight Fallback Judge"
+    qwen3-reranker-4b:
+      alias: "qwen3-reranker-4b"
+      hf_repo_id: "mlx-community/Qwen3-Reranker-4B-4bit"
+      prompt_style: "qwen3-reranker"
+      positive_tokens: ["yes", "Yes", "YES", "是"]
+      negative_tokens: ["no", "No", "NO", "否"]
+      calibration_temperature: 1.0
+      choice_temperature: 3.5
+      score_temperature: 2.5
+      default_threshold: 0.5
+      approx_memory_gb: 2.5
+      description: "Qwen3-Reranker-4B (4-bit MLX) — Cross-Encoder Pointwise Rubric Scorer"
 
 # 3. Deterministic SQLite Content-Addressable Cache
 cache:
@@ -278,12 +312,24 @@ func LoadOrInit(configPath string) (*types.AppConfig, string, bool, error) {
 				if existing.CalibrationTemperature <= 0 {
 					existing.CalibrationTemperature = defSpec.CalibrationTemperature
 				}
+				if existing.ChoiceTemperature <= 0 {
+					existing.ChoiceTemperature = defSpec.ChoiceTemperature
+				}
+				if existing.ScoreTemperature <= 0 {
+					existing.ScoreTemperature = defSpec.ScoreTemperature
+				}
 				if existing.DefaultThreshold <= 0 {
 					existing.DefaultThreshold = defSpec.DefaultThreshold
+				}
+				if defSpec.SupportsVision {
+					existing.SupportsVision = true
 				}
 				cfg.Models.Registry[k] = existing
 			}
 		}
+	}
+	if cfg.Runtime.VenvDir == "" {
+		cfg.Runtime.VenvDir = "~/.cache/decision-cli/venv"
 	}
 	if cfg.Models.Paths == nil {
 		cfg.Models.Paths = map[string]string{}

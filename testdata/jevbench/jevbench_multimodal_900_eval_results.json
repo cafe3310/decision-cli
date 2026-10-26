@@ -1,0 +1,554 @@
+{
+  "benchmark": "JevBench Multimodal Decision Suite (derived from imagejev-box-v0.1)",
+  "evaluated_at": "2026-10-26T20:06:41+0800",
+  "n_images": 300,
+  "n_decisions_per_model": 900,
+  "models": {
+    "gemma-4-e4b": {
+      "image_tokens": 280,
+      "tracks": {
+        "noul_verification": {
+          "n": 300,
+          "correct": 258,
+          "accuracy": 0.86,
+          "chance": 0.5,
+          "chance_corrected_intelligence": 72.0,
+          "ece": 0.0661,
+          "calibration_score": 86.78,
+          "capability_score": 79.39,
+          "mean_brier": 0.2295,
+          "by_family": {
+            "coco": {
+              "n": 200,
+              "correct": 166,
+              "accuracy": 0.83,
+              "chance_corrected": 66.0
+            },
+            "doc": {
+              "n": 50,
+              "correct": 45,
+              "accuracy": 0.9,
+              "chance_corrected": 80.0
+            },
+            "ui": {
+              "n": 50,
+              "correct": 47,
+              "accuracy": 0.94,
+              "chance_corrected": 88.0
+            }
+          },
+          "by_kind": {
+            "doc": {
+              "n": 50,
+              "correct": 45,
+              "accuracy": 0.9,
+              "chance_corrected": 80.0
+            },
+            "ref": {
+              "n": 70,
+              "correct": 56,
+              "accuracy": 0.8,
+              "chance_corrected": 60.0
+            },
+            "single": {
+              "n": 80,
+              "correct": 72,
+              "accuracy": 0.9,
+              "chance_corrected": 80.0
+            },
+            "small": {
+              "n": 50,
+              "correct": 38,
+              "accuracy": 0.76,
+              "chance_corrected": 52.0
+            },
+            "ui": {
+              "n": 50,
+              "correct": 47,
+              "accuracy": 0.94,
+              "chance_corrected": 88.0
+            }
+          },
+          "by_size_bucket": {
+            "large": {
+              "n": 81,
+              "correct": 75,
+              "accuracy": 0.9259,
+              "chance_corrected": 85.19
+            },
+            "medium": {
+              "n": 97,
+              "correct": 85,
+              "accuracy": 0.8763,
+              "chance_corrected": 75.26
+            },
+            "small": {
+              "n": 122,
+              "correct": 98,
+              "accuracy": 0.8033,
+              "chance_corrected": 60.66
+            }
+          },
+          "latency_p50_ms": 443.6,
+          "latency_p95_ms": 1495.1
+        },
+        "choice_classification": {
+          "n": 300,
+          "correct": 275,
+          "accuracy": 0.9167,
+          "chance": 0.25,
+          "chance_corrected_intelligence": 88.89,
+          "ece": 0.1428,
+          "calibration_score": 71.45,
+          "capability_score": 80.17,
+          "mean_brier": 0.155,
+          "by_family": {
+            "coco": {
+              "n": 200,
+              "correct": 177,
+              "accuracy": 0.885,
+              "chance_corrected": 84.67
+            },
+            "doc": {
+              "n": 50,
+              "correct": 48,
+              "accuracy": 0.96,
+              "chance_corrected": 94.67
+            },
+            "ui": {
+              "n": 50,
+              "correct": 50,
+              "accuracy": 1.0,
+              "chance_corrected": 100.0
+            }
+          },
+          "by_kind": {
+            "doc": {
+              "n": 50,
+              "correct": 48,
+              "accuracy": 0.96,
+              "chance_corrected": 94.67
+            },
+            "ref": {
+              "n": 70,
+              "correct": 65,
+              "accuracy": 0.9286,
+              "chance_corrected": 90.48
+            },
+            "single": {
+              "n": 80,
+              "correct": 75,
+              "accuracy": 0.9375,
+              "chance_corrected": 91.67
+            },
+            "small": {
+              "n": 50,
+              "correct": 37,
+              "accuracy": 0.74,
+              "chance_corrected": 65.33
+            },
+            "ui": {
+              "n": 50,
+              "correct": 50,
+              "accuracy": 1.0,
+              "chance_corrected": 100.0
+            }
+          },
+          "by_size_bucket": {
+            "large": {
+              "n": 81,
+              "correct": 81,
+              "accuracy": 1.0,
+              "chance_corrected": 100.0
+            },
+            "medium": {
+              "n": 97,
+              "correct": 90,
+              "accuracy": 0.9278,
+              "chance_corrected": 90.38
+            },
+            "small": {
+              "n": 122,
+              "correct": 104,
+              "accuracy": 0.8525,
+              "chance_corrected": 80.33
+            }
+          },
+          "latency_p50_ms": 333.6,
+          "latency_p95_ms": 1026.2
+        },
+        "choice_spatial_grounding": {
+          "n": 300,
+          "correct": 233,
+          "accuracy": 0.7767,
+          "chance": 0.25,
+          "chance_corrected_intelligence": 70.22,
+          "ece": 0.2195,
+          "calibration_score": 56.09,
+          "capability_score": 63.16,
+          "mean_brier": 0.3788,
+          "by_family": {
+            "coco": {
+              "n": 200,
+              "correct": 146,
+              "accuracy": 0.73,
+              "chance_corrected": 64.0
+            },
+            "doc": {
+              "n": 50,
+              "correct": 42,
+              "accuracy": 0.84,
+              "chance_corrected": 78.67
+            },
+            "ui": {
+              "n": 50,
+              "correct": 45,
+              "accuracy": 0.9,
+              "chance_corrected": 86.67
+            }
+          },
+          "by_kind": {
+            "doc": {
+              "n": 50,
+              "correct": 42,
+              "accuracy": 0.84,
+              "chance_corrected": 78.67
+            },
+            "ref": {
+              "n": 70,
+              "correct": 54,
+              "accuracy": 0.7714,
+              "chance_corrected": 69.52
+            },
+            "single": {
+              "n": 80,
+              "correct": 65,
+              "accuracy": 0.8125,
+              "chance_corrected": 75.0
+            },
+            "small": {
+              "n": 50,
+              "correct": 27,
+              "accuracy": 0.54,
+              "chance_corrected": 38.67
+            },
+            "ui": {
+              "n": 50,
+              "correct": 45,
+              "accuracy": 0.9,
+              "chance_corrected": 86.67
+            }
+          },
+          "by_size_bucket": {
+            "large": {
+              "n": 81,
+              "correct": 74,
+              "accuracy": 0.9136,
+              "chance_corrected": 88.48
+            },
+            "medium": {
+              "n": 97,
+              "correct": 80,
+              "accuracy": 0.8247,
+              "chance_corrected": 76.63
+            },
+            "small": {
+              "n": 122,
+              "correct": 79,
+              "accuracy": 0.6475,
+              "chance_corrected": 53.01
+            }
+          },
+          "latency_p50_ms": 806.2,
+          "latency_p95_ms": 1761.4
+        }
+      },
+      "latency_ms": {},
+      "overall_summary": {
+        "total_decisions": 900,
+        "total_correct": 766,
+        "pooled_accuracy": 0.8511,
+        "macro_chance_corrected_intelligence": 77.04,
+        "macro_calibration_score": 71.44,
+        "macro_capability_score": 74.24,
+        "cold_image_plus_prefill_p50_ms": 443.6,
+        "cold_image_plus_prefill_p95_ms": 1495.1,
+        "cached_vision_prefill_only_p50_ms": 333.6,
+        "cached_vision_prefill_only_p95_ms": 1026.2
+      }
+    },
+    "gemma-4-26b-a4b": {
+      "image_tokens": 280,
+      "tracks": {
+        "noul_verification": {
+          "n": 300,
+          "correct": 243,
+          "accuracy": 0.81,
+          "chance": 0.5,
+          "chance_corrected_intelligence": 62.0,
+          "ece": 0.105,
+          "calibration_score": 79.01,
+          "capability_score": 70.5,
+          "mean_brier": 0.3057,
+          "by_family": {
+            "coco": {
+              "n": 200,
+              "correct": 158,
+              "accuracy": 0.79,
+              "chance_corrected": 58.0
+            },
+            "doc": {
+              "n": 50,
+              "correct": 41,
+              "accuracy": 0.82,
+              "chance_corrected": 64.0
+            },
+            "ui": {
+              "n": 50,
+              "correct": 44,
+              "accuracy": 0.88,
+              "chance_corrected": 76.0
+            }
+          },
+          "by_kind": {
+            "doc": {
+              "n": 50,
+              "correct": 41,
+              "accuracy": 0.82,
+              "chance_corrected": 64.0
+            },
+            "ref": {
+              "n": 70,
+              "correct": 47,
+              "accuracy": 0.6714,
+              "chance_corrected": 34.29
+            },
+            "single": {
+              "n": 80,
+              "correct": 74,
+              "accuracy": 0.925,
+              "chance_corrected": 85.0
+            },
+            "small": {
+              "n": 50,
+              "correct": 37,
+              "accuracy": 0.74,
+              "chance_corrected": 48.0
+            },
+            "ui": {
+              "n": 50,
+              "correct": 44,
+              "accuracy": 0.88,
+              "chance_corrected": 76.0
+            }
+          },
+          "by_size_bucket": {
+            "large": {
+              "n": 81,
+              "correct": 69,
+              "accuracy": 0.8519,
+              "chance_corrected": 70.37
+            },
+            "medium": {
+              "n": 97,
+              "correct": 80,
+              "accuracy": 0.8247,
+              "chance_corrected": 64.95
+            },
+            "small": {
+              "n": 122,
+              "correct": 94,
+              "accuracy": 0.7705,
+              "chance_corrected": 54.1
+            }
+          },
+          "latency_p50_ms": 750.9,
+          "latency_p95_ms": 2511.8
+        },
+        "choice_classification": {
+          "n": 300,
+          "correct": 287,
+          "accuracy": 0.9567,
+          "chance": 0.25,
+          "chance_corrected_intelligence": 94.22,
+          "ece": 0.0428,
+          "calibration_score": 91.44,
+          "capability_score": 92.83,
+          "mean_brier": 0.0711,
+          "by_family": {
+            "coco": {
+              "n": 200,
+              "correct": 188,
+              "accuracy": 0.94,
+              "chance_corrected": 92.0
+            },
+            "doc": {
+              "n": 50,
+              "correct": 49,
+              "accuracy": 0.98,
+              "chance_corrected": 97.33
+            },
+            "ui": {
+              "n": 50,
+              "correct": 50,
+              "accuracy": 1.0,
+              "chance_corrected": 100.0
+            }
+          },
+          "by_kind": {
+            "doc": {
+              "n": 50,
+              "correct": 49,
+              "accuracy": 0.98,
+              "chance_corrected": 97.33
+            },
+            "ref": {
+              "n": 70,
+              "correct": 66,
+              "accuracy": 0.9429,
+              "chance_corrected": 92.38
+            },
+            "single": {
+              "n": 80,
+              "correct": 79,
+              "accuracy": 0.9875,
+              "chance_corrected": 98.33
+            },
+            "small": {
+              "n": 50,
+              "correct": 43,
+              "accuracy": 0.86,
+              "chance_corrected": 81.33
+            },
+            "ui": {
+              "n": 50,
+              "correct": 50,
+              "accuracy": 1.0,
+              "chance_corrected": 100.0
+            }
+          },
+          "by_size_bucket": {
+            "large": {
+              "n": 81,
+              "correct": 81,
+              "accuracy": 1.0,
+              "chance_corrected": 100.0
+            },
+            "medium": {
+              "n": 97,
+              "correct": 95,
+              "accuracy": 0.9794,
+              "chance_corrected": 97.25
+            },
+            "small": {
+              "n": 122,
+              "correct": 111,
+              "accuracy": 0.9098,
+              "chance_corrected": 87.98
+            }
+          },
+          "latency_p50_ms": 428.8,
+          "latency_p95_ms": 1287.1
+        },
+        "choice_spatial_grounding": {
+          "n": 300,
+          "correct": 270,
+          "accuracy": 0.9,
+          "chance": 0.25,
+          "chance_corrected_intelligence": 86.67,
+          "ece": 0.0701,
+          "calibration_score": 85.97,
+          "capability_score": 86.32,
+          "mean_brier": 0.1453,
+          "by_family": {
+            "coco": {
+              "n": 200,
+              "correct": 176,
+              "accuracy": 0.88,
+              "chance_corrected": 84.0
+            },
+            "doc": {
+              "n": 50,
+              "correct": 47,
+              "accuracy": 0.94,
+              "chance_corrected": 92.0
+            },
+            "ui": {
+              "n": 50,
+              "correct": 47,
+              "accuracy": 0.94,
+              "chance_corrected": 92.0
+            }
+          },
+          "by_kind": {
+            "doc": {
+              "n": 50,
+              "correct": 47,
+              "accuracy": 0.94,
+              "chance_corrected": 92.0
+            },
+            "ref": {
+              "n": 70,
+              "correct": 59,
+              "accuracy": 0.8429,
+              "chance_corrected": 79.05
+            },
+            "single": {
+              "n": 80,
+              "correct": 78,
+              "accuracy": 0.975,
+              "chance_corrected": 96.67
+            },
+            "small": {
+              "n": 50,
+              "correct": 39,
+              "accuracy": 0.78,
+              "chance_corrected": 70.67
+            },
+            "ui": {
+              "n": 50,
+              "correct": 47,
+              "accuracy": 0.94,
+              "chance_corrected": 92.0
+            }
+          },
+          "by_size_bucket": {
+            "large": {
+              "n": 81,
+              "correct": 80,
+              "accuracy": 0.9877,
+              "chance_corrected": 98.35
+            },
+            "medium": {
+              "n": 97,
+              "correct": 91,
+              "accuracy": 0.9381,
+              "chance_corrected": 91.75
+            },
+            "small": {
+              "n": 122,
+              "correct": 99,
+              "accuracy": 0.8115,
+              "chance_corrected": 74.86
+            }
+          },
+          "latency_p50_ms": 1037.4,
+          "latency_p95_ms": 1591.5
+        }
+      },
+      "latency_ms": {},
+      "overall_summary": {
+        "total_decisions": 900,
+        "total_correct": 800,
+        "pooled_accuracy": 0.8889,
+        "macro_chance_corrected_intelligence": 80.96,
+        "macro_calibration_score": 85.47,
+        "macro_capability_score": 83.22,
+        "cold_image_plus_prefill_p50_ms": 750.9,
+        "cold_image_plus_prefill_p95_ms": 2511.8,
+        "cached_vision_prefill_only_p50_ms": 428.8,
+        "cached_vision_prefill_only_p95_ms": 1287.1
+      }
+    }
+  }
+}

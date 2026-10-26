@@ -15,11 +15,12 @@ import (
 )
 
 // LoadBatchItems reads a batch input file (.json, .jsonl, .yaml, .yml) and extracts BatchItemInput records.
-// Supports:
-//  - Top-level list of objects `[ {...}, {...} ]`
-//  - Top-level wrapper object containing `"insights"`, `"records"`, `"items"`, or `"results"`
-//  - JSONL (one JSON object per line)
 func LoadBatchItems(inputPath, idField, contextTemplate string) ([]types.BatchItemInput, error) {
+	return LoadBatchItemsWithImages(inputPath, idField, contextTemplate, "", "")
+}
+
+// LoadBatchItemsWithImages reads a batch input file and extracts ID, Context, and per-record Images.
+func LoadBatchItemsWithImages(inputPath, idField, contextTemplate, imageField, imageBaseDir string) ([]types.BatchItemInput, error) {
 	rawBytes, err := os.ReadFile(inputPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read input file %s: %w", inputPath, err)
@@ -79,6 +80,7 @@ func LoadBatchItems(inputPath, idField, contextTemplate string) ([]types.BatchIt
 		}
 	}
 
+	inputDir := filepath.Dir(inputPath)
 	items := make([]types.BatchItemInput, 0, len(rawRecords))
 	for idx, rec := range rawRecords {
 		id := extractRecordID(rec, idField, idx)
@@ -86,13 +88,79 @@ func LoadBatchItems(inputPath, idField, contextTemplate string) ([]types.BatchIt
 		if err != nil {
 			return nil, fmt.Errorf("failed to build context for record %s: %w", id, err)
 		}
+		imgs := extractRecordImages(rec, imageField, imageBaseDir, inputDir)
 		items = append(items, types.BatchItemInput{
 			ID:      id,
 			Context: ctxStr,
+			Images:  imgs,
 			Raw:     rec,
 		})
 	}
 	return items, nil
+}
+
+func extractRecordImages(rec map[string]any, imageField, imageBaseDir, inputDir string) []string {
+	var fields []string
+	if strings.TrimSpace(imageField) != "" {
+		fields = []string{strings.TrimSpace(imageField)}
+	} else {
+		fields = []string{"images", "image"}
+	}
+	var rawList []string
+	for _, f := range fields {
+		val, ok := rec[f]
+		if !ok || val == nil {
+			continue
+		}
+		switch v := val.(type) {
+		case string:
+			s := strings.TrimSpace(v)
+			if s != "" {
+				rawList = append(rawList, s)
+			}
+		case []string:
+			for _, elem := range v {
+				s := strings.TrimSpace(elem)
+				if s != "" {
+					rawList = append(rawList, s)
+				}
+			}
+		case []any:
+			for _, elem := range v {
+				s := strings.TrimSpace(fmt.Sprintf("%v", elem))
+				if s != "" && s != "<nil>" {
+					rawList = append(rawList, s)
+				}
+			}
+		}
+		if len(rawList) > 0 {
+			break
+		}
+	}
+	if len(rawList) == 0 {
+		return nil
+	}
+	resolved := make([]string, 0, len(rawList))
+	for _, img := range rawList {
+		if strings.HasPrefix(img, "data:image/") || strings.HasPrefix(img, "base64:") || strings.HasPrefix(img, "file://") || filepath.IsAbs(img) || strings.HasPrefix(img, "~/") {
+			resolved = append(resolved, img)
+			continue
+		}
+		if imageBaseDir != "" {
+			resolved = append(resolved, filepath.Join(imageBaseDir, img))
+			continue
+		}
+		// If relative path does not exist in CWD, check relative to batch input file directory
+		if _, err := os.Stat(img); err != nil && inputDir != "" && inputDir != "." {
+			cand := filepath.Join(inputDir, img)
+			if _, cErr := os.Stat(cand); cErr == nil {
+				resolved = append(resolved, cand)
+				continue
+			}
+		}
+		resolved = append(resolved, img)
+	}
+	return resolved
 }
 
 func extractRecordSlice(generic any) ([]map[string]any, error) {
@@ -179,7 +247,30 @@ func buildRecordContext(rec map[string]any, tmpl *template.Template) (string, er
 	return string(b), nil
 }
 
-// FormatAndWrite outputs v to stdout and/or outputPath in the requested format.
+// LoadSystemOneRequest reads a TypeSafe Jev /v1/systemone request from a JSON/YAML file or raw JSON string.
+func LoadSystemOneRequest(pathOrRaw string) (*types.SystemOneRequest, error) {
+	trimmed := strings.TrimSpace(pathOrRaw)
+	var rawBytes []byte
+	var err error
+	if strings.HasPrefix(trimmed, "{") {
+		rawBytes = []byte(trimmed)
+	} else {
+		rawBytes, err = os.ReadFile(trimmed)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read systemone input %s: %w", trimmed, err)
+		}
+	}
+	var req types.SystemOneRequest
+	if err := json.Unmarshal(rawBytes, &req); err != nil {
+		if yErr := yaml.Unmarshal(rawBytes, &req); yErr != nil {
+			return nil, fmt.Errorf("failed to parse systemone request as JSON (%v) or YAML (%v)", err, yErr)
+		}
+	}
+	if len(req.Questions) == 0 {
+		return nil, fmt.Errorf("systemone request must contain at least one question in 'questions'")
+	}
+	return &req, nil
+}
 // Supported formats: json, yaml, jsonl, compact, label-only.
 func FormatAndWrite(v any, format string, outputPath string) error {
 	// If outputPath is given and format is auto/default, infer file format for the file write
@@ -271,10 +362,24 @@ func serialize(v any, format string) ([]byte, error) {
 			return []byte(val.Decision + "\n"), nil
 		case types.SingleDecisionResult:
 			return []byte(val.Decision + "\n"), nil
+		case *types.SingleChoiceResult:
+			return []byte(val.Choice + "\n"), nil
+		case types.SingleChoiceResult:
+			return []byte(val.Choice + "\n"), nil
+		case *types.SingleScoreResult:
+			return []byte(fmt.Sprintf("%.4f\t%s\n", val.Score, val.TopLabel)), nil
+		case types.SingleScoreResult:
+			return []byte(fmt.Sprintf("%.4f\t%s\n", val.Score, val.TopLabel)), nil
 		case *types.BatchDecisionReport:
 			var sb strings.Builder
 			for _, r := range val.Results {
-				sb.WriteString(fmt.Sprintf("%s\t%s\t%.4f\n", r.ID, r.Decision, r.Probability))
+				if r.Primitive == "choice" {
+					sb.WriteString(fmt.Sprintf("%s\t%s\t%.4f\n", r.ID, r.Choice, r.Confidence))
+				} else if r.Primitive == "score" && r.Score != nil {
+					sb.WriteString(fmt.Sprintf("%s\t%.4f\t%s\n", r.ID, *r.Score, r.Decision))
+				} else {
+					sb.WriteString(fmt.Sprintf("%s\t%s\t%.4f\n", r.ID, r.Decision, r.Probability))
+				}
 			}
 			return []byte(sb.String()), nil
 		}

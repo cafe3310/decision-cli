@@ -41,12 +41,12 @@ type ResolvedModel struct {
 	CachedOnDisk bool           `json:"cached_on_disk" yaml:"cached_on_disk"`
 }
 
-// ProbeMLXCommand checks whether cmdPrefix (e.g. ["/path/to/python3"]) has mlx and mlx_lm installed.
+// ProbeMLXCommand checks whether cmdPrefix (e.g. ["/path/to/python3"]) has mlx, mlx_lm, and PIL installed.
 func ProbeMLXCommand(cmdPrefix []string) (mlxVer, mlxLMVer, device string, ok bool) {
 	if len(cmdPrefix) == 0 {
 		return "", "", "", false
 	}
-	probeScript := `import json, mlx.core as mx, mlx_lm
+	probeScript := `import json, mlx.core as mx, mlx_lm, PIL
 print(json.dumps({
   "mlx": getattr(mx, "__version__", "unknown"),
   "mlx_lm": getattr(mlx_lm, "__version__", "unknown"),
@@ -70,11 +70,60 @@ print(json.dumps({
 	return parsed.MLX, parsed.MLXLM, parsed.Device, true
 }
 
-// ResolveRuntime resolves the Python + MLX command according to config.yaml priority:
+// EnsureManagedVenv creates or repairs the self-contained Python virtual environment
+// at cfg.Runtime.VenvDir (default ~/.cache/decision-cli/venv) using uv.
+func EnsureManagedVenv(cfg *types.AppConfig) (string, error) {
+	venvDir := cfg.Runtime.VenvDir
+	if strings.TrimSpace(venvDir) == "" {
+		venvDir = "~/.cache/decision-cli/venv"
+	}
+	expandedVenv := config.ExpandPath(venvDir)
+	venvPy := filepath.Join(expandedVenv, "bin", "python3")
+
+	if _, err := os.Stat(venvPy); err == nil {
+		if _, _, _, ok := ProbeMLXCommand([]string{venvPy}); ok {
+			return venvPy, nil
+		}
+	}
+
+	uvBin := strings.TrimSpace(cfg.Runtime.UVBin)
+	if uvBin == "" {
+		uvBin = "uv"
+	}
+	if _, err := exec.LookPath(uvBin); err != nil {
+		// Check common uv locations on macOS
+		for _, cand := range []string{"/opt/homebrew/bin/uv", filepath.Join(config.ExpandPath("~"), ".local/bin/uv"), filepath.Join(config.ExpandPath("~"), ".cargo/bin/uv")} {
+			if _, sErr := os.Stat(cand); sErr == nil {
+				uvBin = cand
+				break
+			}
+		}
+	}
+
+	if err := os.MkdirAll(filepath.Dir(expandedVenv), 0755); err != nil {
+		return "", fmt.Errorf("failed to create parent directory for venv %s: %w", expandedVenv, err)
+	}
+
+	if _, err := os.Stat(venvPy); os.IsNotExist(err) {
+		venvCmd := exec.Command(uvBin, "venv", expandedVenv)
+		if out, err := venvCmd.CombinedOutput(); err != nil {
+			return "", fmt.Errorf("failed to create self-contained venv at %s via %s: %v (%s)", expandedVenv, uvBin, err, strings.TrimSpace(string(out)))
+		}
+	}
+
+	pipCmd := exec.Command(uvBin, "pip", "install", "--python", venvPy, "mlx>=0.32.0", "mlx-lm>=0.32.0", "pillow")
+	if out, err := pipCmd.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("failed to install mlx, mlx-lm, pillow into %s: %v (%s)", expandedVenv, err, strings.TrimSpace(string(out)))
+	}
+
+	return venvPy, nil
+}
+
+// ResolveRuntime resolves the self-contained Python + MLX command according to config.yaml priority:
 // 1. runtime.mlx_command
 // 2. runtime.python_bin
-// 3. runtime.venv_dir
-// 4. Known local MLX virtual environments or system python3
+// 3. runtime.venv_dir (default ~/.cache/decision-cli/venv, auto-provisioned via uv if missing)
+// 4. System python3 fallback if uv provisioning is unavailable
 func ResolveRuntime(cfg *types.AppConfig) ResolvedRuntime {
 	// 1. Explicit mlx_command
 	if len(cfg.Runtime.MLXCommand) > 0 {
@@ -96,7 +145,7 @@ func ResolveRuntime(cfg *types.AppConfig) ResolvedRuntime {
 			Command: cmd,
 			Source:  "config:runtime.mlx_command",
 			Valid:   false,
-			Error:   fmt.Sprintf("configured runtime.mlx_command %v failed 'import mlx.core, mlx_lm'", cmd),
+			Error:   fmt.Sprintf("configured runtime.mlx_command %v failed 'import mlx.core, mlx_lm, PIL'", cmd),
 		}
 	}
 
@@ -118,36 +167,50 @@ func ResolveRuntime(cfg *types.AppConfig) ResolvedRuntime {
 			Command: cmd,
 			Source:  "config:runtime.python_bin",
 			Valid:   false,
-			Error:   fmt.Sprintf("configured runtime.python_bin (%s) failed 'import mlx.core, mlx_lm'", py),
+			Error:   fmt.Sprintf("configured runtime.python_bin (%s) failed 'import mlx.core, mlx_lm, PIL'", py),
 		}
 	}
 
-	// 3. Configured venv_dir
-	if cfg.Runtime.VenvDir != "" {
-		venvPy := filepath.Join(config.ExpandPath(cfg.Runtime.VenvDir), "bin", "python3")
-		if _, err := os.Stat(venvPy); err == nil {
-			cmd := []string{venvPy}
-			if mlxV, lmV, dev, ok := ProbeMLXCommand(cmd); ok {
-				return ResolvedRuntime{
-					Command:    cmd,
-					Source:     fmt.Sprintf("config:runtime.venv_dir (%s)", cfg.Runtime.VenvDir),
-					MLXVersion: mlxV,
-					MLXLMVer:   lmV,
-					DeviceInfo: dev,
-					Valid:      true,
-				}
+	// 3. Self-contained venv_dir (default ~/.cache/decision-cli/venv)
+	venvDir := cfg.Runtime.VenvDir
+	if strings.TrimSpace(venvDir) == "" {
+		venvDir = "~/.cache/decision-cli/venv"
+	}
+	venvPy := filepath.Join(config.ExpandPath(venvDir), "bin", "python3")
+	if _, err := os.Stat(venvPy); err == nil {
+		cmd := []string{venvPy}
+		if mlxV, lmV, dev, ok := ProbeMLXCommand(cmd); ok {
+			return ResolvedRuntime{
+				Command:    cmd,
+				Source:     fmt.Sprintf("self-contained venv (%s)", venvDir),
+				MLXVersion: mlxV,
+				MLXLMVer:   lmV,
+				DeviceInfo: dev,
+				Valid:      true,
 			}
 		}
 	}
 
-	// 4. Auto-discover existing MLX environments on the system without installing anything
-	home, _ := os.UserHomeDir()
+	// Auto-provision the self-contained venv via uv if missing or incomplete
+	if provisionedPy, err := EnsureManagedVenv(cfg); err == nil {
+		cmd := []string{provisionedPy}
+		if mlxV, lmV, dev, ok := ProbeMLXCommand(cmd); ok {
+			return ResolvedRuntime{
+				Command:    cmd,
+				Source:     fmt.Sprintf("self-contained venv (auto-provisioned: %s)", venvDir),
+				MLXVersion: mlxV,
+				MLXLMVer:   lmV,
+				DeviceInfo: dev,
+				Valid:      true,
+			}
+		}
+	}
+
+	// 4. System python3 fallback (no external workspace venv reliance)
 	candidates := []struct {
 		bin    string
 		source string
 	}{
-		{filepath.Join(home, "workspace/mlx-exp-02-microsystem/.venv/bin/python3"), "auto-detected: ~/workspace/mlx-exp-02-microsystem/.venv"},
-		{filepath.Join(home, "workspace/mlx-exp-03-chat/.venv/bin/python3"), "auto-detected: ~/workspace/mlx-exp-03-chat/.venv"},
 		{"/opt/homebrew/bin/python3", "system: /opt/homebrew/bin/python3"},
 		{"python3", "system: PATH python3"},
 	}
@@ -167,7 +230,7 @@ func ResolveRuntime(cfg *types.AppConfig) ResolvedRuntime {
 
 	return ResolvedRuntime{
 		Valid: false,
-		Error: "no Python environment with 'mlx' and 'mlx_lm' found; configure runtime.venv_dir / runtime.python_bin in ~/.config/decision-cli/config.yaml or run 'decision-cli setup'",
+		Error: "no self-contained Python environment with 'mlx', 'mlx_lm', and 'pillow' found at ~/.cache/decision-cli/venv; ensure 'uv' is installed or configure runtime.python_bin in ~/.config/decision-cli/config.yaml",
 	}
 }
 
@@ -362,37 +425,63 @@ func findLatestSnapshot(hfRepoRoot string) string {
 
 // EnsureWorkerScript materializes embedded mlx_worker.py to ~/.cache/decision-cli/mlx_worker.py.
 func EnsureWorkerScript() (string, error) {
-	scriptPath := config.ExpandPath("~/.cache/decision-cli/mlx_worker.py")
-	if err := os.MkdirAll(filepath.Dir(scriptPath), 0755); err != nil {
-		return "", err
-	}
-	existing, err := os.ReadFile(scriptPath)
-	if err != nil || !bytes.Equal(existing, embeddedWorkerPy) {
-		if err := os.WriteFile(scriptPath, embeddedWorkerPy, 0755); err != nil {
-			return "", err
-		}
-	}
-	return scriptPath, nil
+	scriptPath, _, err := ensureWorkerScriptWithChange()
+	return scriptPath, err
 }
 
-// WorkerScoreItem is a single item sent to mlx_worker.py.
+func ensureWorkerScriptWithChange() (string, bool, error) {
+	scriptPath := config.ExpandPath("~/.cache/decision-cli/mlx_worker.py")
+	if err := os.MkdirAll(filepath.Dir(scriptPath), 0755); err != nil {
+		return "", false, err
+	}
+	existing, err := os.ReadFile(scriptPath)
+	changed := false
+	if err != nil || !bytes.Equal(existing, embeddedWorkerPy) {
+		if err := os.WriteFile(scriptPath, embeddedWorkerPy, 0755); err != nil {
+			return "", false, err
+		}
+		changed = true
+	}
+	return scriptPath, changed, nil
+}
+
+// WorkerScoreItem is a single item sent to mlx_worker.py (supports per-item primitive/rubrics/choices/score_levels/images overrides).
 type WorkerScoreItem struct {
-	ID      string `json:"id"`
-	Context string `json:"context"`
+	ID          string               `json:"id"`
+	Context     string               `json:"context"`
+	Images      []string             `json:"images,omitempty"`
+	ImageTokens int                  `json:"image_tokens,omitempty"`
+	Primitive   string               `json:"primitive,omitempty"`
+	Rubrics     string               `json:"rubrics,omitempty"`
+	Choices     []types.ChoiceOption `json:"choices,omitempty"`
+	ScoreLevels []string             `json:"score_levels,omitempty"`
+	DebiasOrder *bool                `json:"debias_order,omitempty"`
 }
 
 // WorkerScoreResult is the raw logit result returned by mlx_worker.py for one item.
 type WorkerScoreResult struct {
-	ID        string  `json:"id"`
-	LogitYes  float64 `json:"logit_yes"`
-	LogitNo   float64 `json:"logit_no"`
-	Margin    float64 `json:"margin"`
-	LatencyMs float64 `json:"latency_ms"`
+	ID           string             `json:"id"`
+	LogitYes     float64            `json:"logit_yes"`
+	LogitNo      float64            `json:"logit_no"`
+	Margin       float64            `json:"margin"`
+	OptionLogits map[string]float64 `json:"option_logits,omitempty"`
+	LatencyMs    float64            `json:"latency_ms"`
+}
+
+// WorkerMultiParams specifies primitive-specific parameters for mlx_worker.py.
+type WorkerMultiParams struct {
+	Primitive   string               `json:"primitive"` // "noul" | "choice" | "score"
+	Rubrics     string               `json:"rubrics"`
+	Choices     []types.ChoiceOption `json:"choices,omitempty"`
+	ScoreLevels []string             `json:"score_levels,omitempty"`
+	DebiasOrder bool                 `json:"debias_order,omitempty"`
+	ImageTokens int                  `json:"image_tokens,omitempty"`
 }
 
 // ScoreResponse is the JSON envelope returned by mlx_worker.py.
 type ScoreResponse struct {
 	OK          bool                `json:"ok"`
+	Primitive   string              `json:"primitive,omitempty"`
 	Error       string              `json:"error,omitempty"`
 	Traceback   string              `json:"traceback,omitempty"`
 	ModelPath   string              `json:"model_path,omitempty"`
@@ -423,15 +512,21 @@ func EnsureDaemonRunning(cfg *types.AppConfig, rt ResolvedRuntime) (string, erro
 		sockPath = config.ExpandPath("~/.cache/decision-cli/worker.sock")
 	}
 
-	// Check if daemon is already alive
-	if pingDaemon(sockPath) {
-		return sockPath, nil
-	}
-
-	scriptPath, err := EnsureWorkerScript()
+	scriptPath, scriptChanged, err := ensureWorkerScriptWithChange()
 	if err != nil {
 		return "", fmt.Errorf("failed to write mlx_worker.py: %w", err)
 	}
+
+	// Check if daemon is already alive
+	if pingDaemon(sockPath) {
+		if !scriptChanged {
+			return sockPath, nil
+		}
+		// Restart daemon so updated mlx_worker.py takes effect
+		shutdownDaemon(sockPath)
+		time.Sleep(100 * time.Millisecond)
+	}
+
 	if err := os.MkdirAll(filepath.Dir(sockPath), 0755); err != nil {
 		return "", err
 	}
@@ -447,23 +542,39 @@ func EnsureDaemonRunning(cfg *types.AppConfig, rt ResolvedRuntime) (string, erro
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("failed to start mlx_worker daemon: %w", err)
 	}
+	exited := make(chan struct{})
 	// Detach wait in background
 	go func() {
 		_ = cmd.Wait()
+		close(exited)
 		if logFile != nil {
 			_ = logFile.Close()
 		}
 	}()
 
-	// Wait up to 8 seconds for socket to become responsive
-	deadline := time.Now().Add(8 * time.Second)
+	// Wait up to 3 seconds for socket to become responsive, or break immediately if daemon exited
+	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
 		if pingDaemon(sockPath) {
 			return sockPath, nil
 		}
-		time.Sleep(80 * time.Millisecond)
+		select {
+		case <-exited:
+			return "", fmt.Errorf("mlx_worker daemon exited before binding socket %s", sockPath)
+		case <-time.After(60 * time.Millisecond):
+		}
 	}
 	return "", fmt.Errorf("mlx_worker daemon did not respond on socket %s within timeout", sockPath)
+}
+
+func shutdownDaemon(sockPath string) {
+	conn, err := net.DialTimeout("unix", sockPath, 300*time.Millisecond)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
+	_, _ = conn.Write([]byte(`{"action":"shutdown"}` + "\n"))
 }
 
 func pingDaemon(sockPath string) bool {
@@ -491,13 +602,16 @@ func pingDaemon(sockPath string) bool {
 	return resp.OK
 }
 
-// ScoreBatchViaMLX evaluates a batch of items using the resident Unix Domain Socket worker
+// ScoreBatchViaMLX evaluates a batch of binary noul items using the resident Unix Domain Socket worker
 // (or falls back to one-shot subprocess if socket bind is restricted).
 func ScoreBatchViaMLX(cfg *types.AppConfig, rt ResolvedRuntime, model ResolvedModel, rubrics string, items []WorkerScoreItem) (*ScoreResponse, error) {
-	return ScoreBatchStreamingViaMLX(cfg, rt, model, rubrics, items, nil, nil)
+	return ScoreMultiStreamingViaMLX(cfg, rt, model, WorkerMultiParams{
+		Primitive: "noul",
+		Rubrics:   rubrics,
+	}, items, nil, nil)
 }
 
-// ScoreBatchStreamingViaMLX evaluates a batch of items in a single worker invocation, calling onItem
+// ScoreBatchStreamingViaMLX evaluates a batch of binary noul items in a single worker invocation, calling onItem
 // immediately as each item is scored so callers can persist to SQLite and emit live progress.
 func ScoreBatchStreamingViaMLX(
 	cfg *types.AppConfig,
@@ -508,17 +622,69 @@ func ScoreBatchStreamingViaMLX(
 	onStatus func(status string),
 	onItem func(res WorkerScoreResult),
 ) (*ScoreResponse, error) {
-	// If small batch and no streaming callback needed, try Unix socket first
-	if onItem == nil {
-		reqPayload := map[string]any{
+	return ScoreMultiStreamingViaMLX(cfg, rt, model, WorkerMultiParams{
+		Primitive: "noul",
+		Rubrics:   rubrics,
+	}, items, onStatus, onItem)
+}
+
+// ScoreMultiViaMLX evaluates a batch of items for any primitive ("noul", "choice", "score").
+func ScoreMultiViaMLX(
+	cfg *types.AppConfig,
+	rt ResolvedRuntime,
+	model ResolvedModel,
+	params WorkerMultiParams,
+	items []WorkerScoreItem,
+) (*ScoreResponse, error) {
+	return ScoreMultiStreamingViaMLX(cfg, rt, model, params, items, nil, nil)
+}
+
+// ScoreMultiStreamingViaMLX evaluates a batch of items for any primitive ("noul", "choice", "score")
+// in a single worker invocation, calling onItem immediately as each item is scored.
+func ScoreMultiStreamingViaMLX(
+	cfg *types.AppConfig,
+	rt ResolvedRuntime,
+	model ResolvedModel,
+	params WorkerMultiParams,
+	items []WorkerScoreItem,
+	onStatus func(status string),
+	onItem func(res WorkerScoreResult),
+) (*ScoreResponse, error) {
+	prim := params.Primitive
+	if prim == "" {
+		prim = "noul"
+	}
+
+	buildReq := func(stream bool) map[string]any {
+		m := map[string]any{
 			"action":          "score",
+			"primitive":       prim,
 			"model_path":      model.LocalPath,
 			"prompt_style":    model.Spec.PromptStyle,
-			"rubrics":         rubrics,
+			"rubrics":         params.Rubrics,
 			"positive_tokens": model.Spec.PositiveTokens,
 			"negative_tokens": model.Spec.NegativeTokens,
+			"debias_order":    params.DebiasOrder,
 			"items":           items,
 		}
+		if stream {
+			m["stream"] = true
+		}
+		if len(params.Choices) > 0 {
+			m["choices"] = params.Choices
+		}
+		if len(params.ScoreLevels) > 0 {
+			m["score_levels"] = params.ScoreLevels
+		}
+		if params.ImageTokens > 0 {
+			m["image_tokens"] = params.ImageTokens
+		}
+		return m
+	}
+
+	// If no streaming callback needed, try Unix socket first
+	if onItem == nil {
+		reqPayload := buildReq(false)
 		if reqBytes, err := json.Marshal(reqPayload); err == nil {
 			if sockPath, err := EnsureDaemonRunning(cfg, rt); err == nil {
 				if resp, sErr := sendSocketRequest(sockPath, reqBytes); sErr == nil {
@@ -528,16 +694,7 @@ func ScoreBatchStreamingViaMLX(
 		}
 	}
 
-	reqPayload := map[string]any{
-		"action":          "score",
-		"stream":          true,
-		"model_path":      model.LocalPath,
-		"prompt_style":    model.Spec.PromptStyle,
-		"rubrics":         rubrics,
-		"positive_tokens": model.Spec.PositiveTokens,
-		"negative_tokens": model.Spec.NegativeTokens,
-		"items":           items,
-	}
+	reqPayload := buildReq(true)
 	reqBytes, err := json.Marshal(reqPayload)
 	if err != nil {
 		return nil, err

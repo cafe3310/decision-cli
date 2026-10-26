@@ -18,53 +18,153 @@ type SingleDecisionResult struct {
 	Logits      LogitDetails `json:"logits" yaml:"logits"`
 	Model       string       `json:"model" yaml:"model"`
 	ModelID     string       `json:"model_id" yaml:"model_id"`
+	Images      []string     `json:"images,omitempty" yaml:"images,omitempty"`
+	ImageTokens int          `json:"image_tokens,omitempty" yaml:"image_tokens,omitempty"`
 	Cached      bool         `json:"cached" yaml:"cached"`
 	LatencyMs   float64      `json:"latency_ms" yaml:"latency_ms"`
 	CacheKey    string       `json:"cache_key" yaml:"cache_key"`
+}
+
+// ChoiceOption defines a single candidate option for the "choice" primitive.
+type ChoiceOption struct {
+	Key         string `json:"key" yaml:"key"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+}
+
+// SingleChoiceResult is the output for a single --choices evaluation.
+type SingleChoiceResult struct {
+	Primitive     string             `json:"primitive" yaml:"primitive"`         // "choice"
+	Choice        string             `json:"choice" yaml:"choice"`               // winning option key
+	Confidence    float64            `json:"confidence" yaml:"confidence"`       // max_i P(k_i)
+	Probabilities map[string]float64 `json:"probabilities" yaml:"probabilities"` // key -> calibrated probability
+	Logits        map[string]float64 `json:"logits" yaml:"logits"`               // key -> raw log-probability
+	DebiasedOrder bool               `json:"debiased_order,omitempty" yaml:"debiased_order,omitempty"`
+	Temperature   float64            `json:"temperature" yaml:"temperature"`
+	Model         string             `json:"model" yaml:"model"`
+	ModelID       string             `json:"model_id" yaml:"model_id"`
+	Images        []string           `json:"images,omitempty" yaml:"images,omitempty"`
+	ImageTokens   int                `json:"image_tokens,omitempty" yaml:"image_tokens,omitempty"`
+	Cached        bool               `json:"cached" yaml:"cached"`
+	LatencyMs     float64            `json:"latency_ms" yaml:"latency_ms"`
+	CacheKey      string             `json:"cache_key" yaml:"cache_key"`
+}
+
+// SingleScoreResult is the output for a single --score ordinal rubric evaluation.
+type SingleScoreResult struct {
+	Primitive       string             `json:"primitive" yaml:"primitive"`               // "score"
+	Score           float64            `json:"score" yaml:"score"`                       // expected value sum(m * P(m)) in [0, M-1]
+	NormalizedScore float64            `json:"normalized_score" yaml:"normalized_score"` // score / (M - 1) in [0.0, 1.0]
+	TopLevel        int                `json:"top_level" yaml:"top_level"`               // argmax_m P(m)
+	TopLabel        string             `json:"top_label" yaml:"top_label"`               // rubric description for TopLevel
+	Confidence      float64            `json:"confidence" yaml:"confidence"`             // max_m P(m)
+	Probabilities   map[string]float64 `json:"probabilities" yaml:"probabilities"`       // "0": p0, "1": p1, ...
+	Legend          map[string]string  `json:"legend" yaml:"legend"`                     // "0": level0, "1": level1, ...
+	Logits          map[string]float64 `json:"logits" yaml:"logits"`                     // "0": l0, "1": l1, ...
+	DebiasedOrder   bool               `json:"debiased_order,omitempty" yaml:"debiased_order,omitempty"`
+	Temperature     float64            `json:"temperature" yaml:"temperature"`
+	Model           string             `json:"model" yaml:"model"`
+	ModelID         string             `json:"model_id" yaml:"model_id"`
+	Images          []string           `json:"images,omitempty" yaml:"images,omitempty"`
+	ImageTokens     int                `json:"image_tokens,omitempty" yaml:"image_tokens,omitempty"`
+	Cached          bool               `json:"cached" yaml:"cached"`
+	LatencyMs       float64            `json:"latency_ms" yaml:"latency_ms"`
+	CacheKey        string             `json:"cache_key" yaml:"cache_key"`
 }
 
 // BatchItemInput represents a single item extracted from a batch input file.
 type BatchItemInput struct {
 	ID      string         `json:"id" yaml:"id"`
 	Context string         `json:"context" yaml:"context"`
+	Images  []string       `json:"images,omitempty" yaml:"images,omitempty"`
 	Raw     map[string]any `json:"raw,omitempty" yaml:"raw,omitempty"`
 }
 
 // BatchItemResult is the per-record output in batch mode.
 type BatchItemResult struct {
-	ID          string         `json:"id" yaml:"id"`
-	Decision    string         `json:"decision" yaml:"decision"` // "是" or "否"
-	Passed      bool           `json:"passed" yaml:"passed"`
-	Probability float64        `json:"probability" yaml:"probability"`
-	Confidence  float64        `json:"confidence" yaml:"confidence"`
-	Logits      LogitDetails   `json:"logits" yaml:"logits"`
-	Cached      bool           `json:"cached" yaml:"cached"`
-	LatencyMs   float64        `json:"latency_ms" yaml:"latency_ms"`
-	CacheKey    string         `json:"cache_key" yaml:"cache_key"`
-	Context     string         `json:"context,omitempty" yaml:"context,omitempty"`
-	Record      map[string]any `json:"record,omitempty" yaml:"record,omitempty"`
+	ID              string             `json:"id" yaml:"id"`
+	Primitive       string             `json:"primitive,omitempty" yaml:"primitive,omitempty"`
+	Decision        string             `json:"decision,omitempty" yaml:"decision,omitempty"` // "是" or "否" (noul), winning key (choice), or top level (score)
+	Choice          string             `json:"choice,omitempty" yaml:"choice,omitempty"`
+	Score           *float64           `json:"score,omitempty" yaml:"score,omitempty"`
+	NormalizedScore *float64           `json:"normalized_score,omitempty" yaml:"normalized_score,omitempty"`
+	Passed          bool               `json:"passed,omitempty" yaml:"passed,omitempty"`
+	Probability     float64            `json:"probability,omitempty" yaml:"probability,omitempty"`
+	Probabilities   map[string]float64 `json:"probabilities,omitempty" yaml:"probabilities,omitempty"`
+	Confidence      float64            `json:"confidence" yaml:"confidence"`
+	Logits          *LogitDetails      `json:"logits,omitempty" yaml:"logits,omitempty"`
+	OptionLogits    map[string]float64 `json:"option_logits,omitempty" yaml:"option_logits,omitempty"`
+	Images          []string           `json:"images,omitempty" yaml:"images,omitempty"`
+	Cached          bool               `json:"cached" yaml:"cached"`
+	LatencyMs       float64            `json:"latency_ms" yaml:"latency_ms"`
+	CacheKey        string             `json:"cache_key" yaml:"cache_key"`
+	Context         string             `json:"context,omitempty" yaml:"context,omitempty"`
+	Record          map[string]any     `json:"record,omitempty" yaml:"record,omitempty"`
 }
 
 // BatchSummary summarizes a batch evaluation run.
 type BatchSummary struct {
-	Total         int     `json:"total" yaml:"total"`
-	PassedCount   int     `json:"passed_count" yaml:"passed_count"`
-	RejectedCount int     `json:"rejected_count" yaml:"rejected_count"`
-	CacheHits     int     `json:"cache_hits" yaml:"cache_hits"`
-	CacheMisses   int     `json:"cache_misses" yaml:"cache_misses"`
-	TotalTimeMs   float64 `json:"total_time_ms" yaml:"total_time_ms"`
+	Total         int            `json:"total" yaml:"total"`
+	PassedCount   int            `json:"passed_count,omitempty" yaml:"passed_count,omitempty"`
+	RejectedCount int            `json:"rejected_count,omitempty" yaml:"rejected_count,omitempty"`
+	ChoiceCounts  map[string]int `json:"choice_counts,omitempty" yaml:"choice_counts,omitempty"`
+	MeanScore     *float64       `json:"mean_score,omitempty" yaml:"mean_score,omitempty"`
+	CacheHits     int            `json:"cache_hits" yaml:"cache_hits"`
+	CacheMisses   int            `json:"cache_misses" yaml:"cache_misses"`
+	TotalTimeMs   float64        `json:"total_time_ms" yaml:"total_time_ms"`
 }
 
 // BatchDecisionReport is the full output structure for batch mode or cache export.
 type BatchDecisionReport struct {
-	ExportedAt  string            `json:"exported_at" yaml:"exported_at"`
-	Model       string            `json:"model" yaml:"model"`
-	ModelID     string            `json:"model_id" yaml:"model_id"`
-	Rubrics     string            `json:"rubrics" yaml:"rubrics"`
-	Threshold   float64           `json:"threshold" yaml:"threshold"`
-	Temperature float64           `json:"temperature" yaml:"temperature"`
-	Summary     BatchSummary      `json:"summary" yaml:"summary"`
-	Results     []BatchItemResult `json:"results" yaml:"results"`
+	ExportedAt    string            `json:"exported_at" yaml:"exported_at"`
+	Primitive     string            `json:"primitive,omitempty" yaml:"primitive,omitempty"`
+	Model         string            `json:"model" yaml:"model"`
+	ModelID       string            `json:"model_id" yaml:"model_id"`
+	Rubrics       string            `json:"rubrics" yaml:"rubrics"`
+	Choices       []ChoiceOption    `json:"choices,omitempty" yaml:"choices,omitempty"`
+	ScoreLevels   []string          `json:"score_levels,omitempty" yaml:"score_levels,omitempty"`
+	DebiasedOrder bool              `json:"debiased_order,omitempty" yaml:"debiased_order,omitempty"`
+	Threshold     float64           `json:"threshold,omitempty" yaml:"threshold,omitempty"`
+	Temperature   float64           `json:"temperature" yaml:"temperature"`
+	Summary       BatchSummary      `json:"summary" yaml:"summary"`
+	Results       []BatchItemResult `json:"results" yaml:"results"`
+}
+
+// SystemOneQuestion represents a single question in a TypeSafe Jev /v1/systemone request.
+type SystemOneQuestion struct {
+	Type         string `json:"type" yaml:"type"`                 // "noul" | "choice" | "score"
+	Instructions string `json:"instructions" yaml:"instructions"` // natural-language prompt/question
+	Criteria     any    `json:"criteria,omitempty" yaml:"criteria,omitempty"`
+}
+
+// SystemOneRequest represents a TypeSafe Jev /v1/systemone request payload.
+type SystemOneRequest struct {
+	Model       string                       `json:"model,omitempty" yaml:"model,omitempty"`
+	ImageTokens int                          `json:"image_tokens,omitempty" yaml:"image_tokens,omitempty"`
+	Images      []string                     `json:"images,omitempty" yaml:"images,omitempty"`
+	Assets      map[string]string            `json:"assets,omitempty" yaml:"assets,omitempty"`
+	State       any                          `json:"state" yaml:"state"`
+	Questions   map[string]SystemOneQuestion `json:"questions" yaml:"questions"`
+}
+
+// SystemOneAnswer represents a single evaluated question in a /v1/systemone response.
+type SystemOneAnswer struct {
+	Type          string             `json:"type" yaml:"type"`
+	Noul          *float64           `json:"noul,omitempty" yaml:"noul,omitempty"`
+	Choice        string             `json:"choice,omitempty" yaml:"choice,omitempty"`
+	Score         *float64           `json:"score,omitempty" yaml:"score,omitempty"`
+	Confidence    *float64           `json:"confidence,omitempty" yaml:"confidence,omitempty"`
+	Probabilities map[string]float64 `json:"probabilities,omitempty" yaml:"probabilities,omitempty"`
+	Legend        map[string]string  `json:"legend,omitempty" yaml:"legend,omitempty"`
+	Cached        bool               `json:"cached" yaml:"cached"`
+	LatencyMs     float64            `json:"latency_ms" yaml:"latency_ms"`
+}
+
+// SystemOneResponse represents a TypeSafe Jev /v1/systemone response payload.
+type SystemOneResponse struct {
+	Model       string                     `json:"model" yaml:"model"`
+	ModelID     string                     `json:"model_id" yaml:"model_id"`
+	Answers     map[string]SystemOneAnswer `json:"answers" yaml:"answers"`
+	TotalTimeMs float64                    `json:"total_time_ms" yaml:"total_time_ms"`
 }
 
 // ModelSpec defines metadata, token configuration, and per-model calibration temperature.
@@ -72,9 +172,12 @@ type ModelSpec struct {
 	Alias                  string   `json:"alias" yaml:"alias"`
 	HFRepoID               string   `json:"hf_repo_id" yaml:"hf_repo_id"`
 	PromptStyle            string   `json:"prompt_style" yaml:"prompt_style"` // "qwen3-reranker" | "gemma4-binary"
+	SupportsVision         bool     `json:"supports_vision,omitempty" yaml:"supports_vision,omitempty"`
 	PositiveTokens         []string `json:"positive_tokens" yaml:"positive_tokens"`
 	NegativeTokens         []string `json:"negative_tokens" yaml:"negative_tokens"`
 	CalibrationTemperature float64  `json:"calibration_temperature" yaml:"calibration_temperature"`
+	ChoiceTemperature      float64  `json:"choice_temperature,omitempty" yaml:"choice_temperature,omitempty"`
+	ScoreTemperature       float64  `json:"score_temperature,omitempty" yaml:"score_temperature,omitempty"`
 	DefaultThreshold       float64  `json:"default_threshold,omitempty" yaml:"default_threshold,omitempty"`
 	ApproxMemoryGB         float64  `json:"approx_memory_gb" yaml:"approx_memory_gb"`
 	Description            string   `json:"description" yaml:"description"`
@@ -114,19 +217,22 @@ type AppConfig struct {
 
 // CacheEntry represents a row in the decision_cache SQLite table.
 type CacheEntry struct {
-	CacheKey     string  `json:"cache_key" yaml:"cache_key"`
-	ModelID      string  `json:"model_id" yaml:"model_id"`
-	RubricHash   string  `json:"rubric_hash" yaml:"rubric_hash"`
-	Rubrics      string  `json:"rubrics" yaml:"rubrics"`
-	RecordID     string  `json:"record_id" yaml:"record_id"`
-	ContextHash  string  `json:"context_hash" yaml:"context_hash"`
-	Context      string  `json:"context" yaml:"context"`
-	LogitYes     float64 `json:"logit_yes" yaml:"logit_yes"`
-	LogitNo      float64 `json:"logit_no" yaml:"logit_no"`
-	LogitMargin  float64 `json:"logit_margin" yaml:"logit_margin"`
-	Probability  float64 `json:"probability" yaml:"probability"`
-	LatencyMs    float64 `json:"latency_ms" yaml:"latency_ms"`
-	CreatedAt    string  `json:"created_at" yaml:"created_at"`
-	HitCount     int     `json:"hit_count" yaml:"hit_count"`
-	LastAccessed string  `json:"last_accessed" yaml:"last_accessed"`
+	CacheKey      string  `json:"cache_key" yaml:"cache_key"`
+	ModelID       string  `json:"model_id" yaml:"model_id"`
+	Primitive     string  `json:"primitive,omitempty" yaml:"primitive,omitempty"`
+	CriteriaJSON  string  `json:"criteria_json,omitempty" yaml:"criteria_json,omitempty"`
+	RawLogitsJSON string  `json:"raw_logits_json,omitempty" yaml:"raw_logits_json,omitempty"`
+	RubricHash    string  `json:"rubric_hash" yaml:"rubric_hash"`
+	Rubrics       string  `json:"rubrics" yaml:"rubrics"`
+	RecordID      string  `json:"record_id" yaml:"record_id"`
+	ContextHash   string  `json:"context_hash" yaml:"context_hash"`
+	Context       string  `json:"context" yaml:"context"`
+	LogitYes      float64 `json:"logit_yes" yaml:"logit_yes"`
+	LogitNo       float64 `json:"logit_no" yaml:"logit_no"`
+	LogitMargin   float64 `json:"logit_margin" yaml:"logit_margin"`
+	Probability   float64 `json:"probability" yaml:"probability"`
+	LatencyMs     float64 `json:"latency_ms" yaml:"latency_ms"`
+	CreatedAt     string  `json:"created_at" yaml:"created_at"`
+	HitCount      int     `json:"hit_count" yaml:"hit_count"`
+	LastAccessed  string  `json:"last_accessed" yaml:"last_accessed"`
 }
