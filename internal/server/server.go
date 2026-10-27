@@ -58,21 +58,22 @@ func RunServer(opts ServerOptions) error {
 
 	// 1. POST /v1/systemone - 复合多问判定标准接口
 	mux.HandleFunc("/v1/systemone", func(w http.ResponseWriter, r *http.Request) {
+		t0 := time.Now()
 		if r.Method != http.MethodPost {
-			writeJSONError(w, http.StatusMethodNotAllowed, "只支持 POST 方法")
+			writeJSONError(w, r, t0, "", http.StatusMethodNotAllowed, "只支持 POST 方法")
 			return
 		}
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("读取请求体失败: %v", err))
+			writeJSONError(w, r, t0, "", http.StatusBadRequest, fmt.Sprintf("读取请求体失败: %v", err))
 			return
 		}
 		defer r.Body.Close()
 
 		req, err := exporter.LoadSystemOneRequest(string(body))
 		if err != nil {
-			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("解析 SystemOne 请求失败: %v", err))
+			writeJSONError(w, r, t0, "", http.StatusBadRequest, fmt.Sprintf("解析 SystemOne 请求失败: %v", err))
 			return
 		}
 
@@ -91,17 +92,19 @@ func RunServer(opts ServerOptions) error {
 
 		resp, err := engine.EvaluateSystemOne(cfg, store, baseOpts, req, 0, false)
 		if err != nil {
-			writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("推理失败: %v", err))
+			writeJSONError(w, r, t0, reqModel, http.StatusInternalServerError, fmt.Sprintf("推理失败: %v", err))
 			return
 		}
 
 		writeJSON(w, http.StatusOK, resp)
+		logServerAccess(r, http.StatusOK, time.Since(t0), reqModel, fmt.Sprintf("SystemOne 复合问卷 (%d 项判定)", len(resp.Answers)))
 	})
 
 	// 2. POST /v1/noun - 单条二元判定快捷接口
 	mux.HandleFunc("/v1/noun", func(w http.ResponseWriter, r *http.Request) {
+		t0 := time.Now()
 		if r.Method != http.MethodPost {
-			writeJSONError(w, http.StatusMethodNotAllowed, "只支持 POST 方法")
+			writeJSONError(w, r, t0, "", http.StatusMethodNotAllowed, "只支持 POST 方法")
 			return
 		}
 
@@ -118,7 +121,7 @@ func RunServer(opts ServerOptions) error {
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("JSON 请求体解析失败: %v", err))
+			writeJSONError(w, r, t0, "", http.StatusBadRequest, fmt.Sprintf("JSON 请求体解析失败: %v", err))
 			return
 		}
 
@@ -129,7 +132,7 @@ func RunServer(opts ServerOptions) error {
 		imgs = append(imgs, payload.Images...)
 
 		if strings.TrimSpace(payload.Rubrics) == "" || (strings.TrimSpace(payload.Context) == "" && len(imgs) == 0) {
-			writeJSONError(w, http.StatusBadRequest, "rubrics 为必填字段，且 context 与 image/images 至少需提供一项")
+			writeJSONError(w, r, t0, "", http.StatusBadRequest, "rubrics 为必填字段，且 context 与 image/images 至少需提供一项")
 			return
 		}
 
@@ -138,7 +141,12 @@ func RunServer(opts ServerOptions) error {
 			targetModel = payload.Model
 		}
 
-		rm, _ := infra.ResolveModel(cfg, targetModel)
+		rm, err := infra.ResolveModel(cfg, targetModel)
+		if err != nil {
+			writeJSONError(w, r, t0, targetModel, http.StatusBadRequest, fmt.Sprintf("解析模型失败: %v", err))
+			return
+		}
+
 		th := 0.5
 		thChanged := false
 		if payload.Threshold != nil {
@@ -173,17 +181,19 @@ func RunServer(opts ServerOptions) error {
 
 		res, err := engine.EvaluateSingle(cfg, store, singleOpts, payload.Context)
 		if err != nil {
-			writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("推理失败: %v", err))
+			writeJSONError(w, r, t0, targetModel, http.StatusInternalServerError, fmt.Sprintf("推理失败: %v", err))
 			return
 		}
 
 		writeJSON(w, http.StatusOK, res)
+		logServerAccess(r, http.StatusOK, time.Since(t0), targetModel, fmt.Sprintf("决策: %s (p=%.3f, cache: %s)", res.Decision, res.Probability, cacheTag(res.Cached)))
 	})
 
 	// 3. POST /v1/choose - 单条多分类选择快捷接口
 	mux.HandleFunc("/v1/choose", func(w http.ResponseWriter, r *http.Request) {
+		t0 := time.Now()
 		if r.Method != http.MethodPost {
-			writeJSONError(w, http.StatusMethodNotAllowed, "只支持 POST 方法")
+			writeJSONError(w, r, t0, "", http.StatusMethodNotAllowed, "只支持 POST 方法")
 			return
 		}
 
@@ -201,7 +211,7 @@ func RunServer(opts ServerOptions) error {
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("JSON 请求体解析失败: %v", err))
+			writeJSONError(w, r, t0, "", http.StatusBadRequest, fmt.Sprintf("JSON 请求体解析失败: %v", err))
 			return
 		}
 
@@ -212,7 +222,7 @@ func RunServer(opts ServerOptions) error {
 		imgs = append(imgs, payload.Images...)
 
 		if strings.TrimSpace(payload.Rubrics) == "" || (strings.TrimSpace(payload.Context) == "" && len(imgs) == 0) {
-			writeJSONError(w, http.StatusBadRequest, "rubrics 为必填字段，且 context 与 image/images 至少需提供一项")
+			writeJSONError(w, r, t0, "", http.StatusBadRequest, "rubrics 为必填字段，且 context 与 image/images 至少需提供一项")
 			return
 		}
 
@@ -222,11 +232,11 @@ func RunServer(opts ServerOptions) error {
 		if err := json.Unmarshal(payload.Choices, &choicesStr); err == nil {
 			parsedChoices, err = engine.ParseChoicesFlag(choicesStr)
 			if err != nil {
-				writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("解析 choices 字符串失败: %v", err))
+				writeJSONError(w, r, t0, "", http.StatusBadRequest, fmt.Sprintf("解析 choices 字符串失败: %v", err))
 				return
 			}
 		} else if err := json.Unmarshal(payload.Choices, &parsedChoices); err != nil {
-			writeJSONError(w, http.StatusBadRequest, "choices 必须为字符串或 [{\"key\":\"...\",\"description\":\"...\"}] 数组")
+			writeJSONError(w, r, t0, "", http.StatusBadRequest, "choices 必须为字符串或 [{\"key\":\"...\",\"description\":\"...\"}] 数组")
 			return
 		}
 
@@ -235,7 +245,12 @@ func RunServer(opts ServerOptions) error {
 			targetModel = payload.Model
 		}
 
-		rm, _ := infra.ResolveModel(cfg, targetModel)
+		rm, err := infra.ResolveModel(cfg, targetModel)
+		if err != nil {
+			writeJSONError(w, r, t0, targetModel, http.StatusBadRequest, fmt.Sprintf("解析模型失败: %v", err))
+			return
+		}
+
 		temp := 1.0
 		tempChanged := false
 		if payload.Temperature != nil {
@@ -268,17 +283,19 @@ func RunServer(opts ServerOptions) error {
 
 		res, err := engine.EvaluateSingleChoice(cfg, store, chooseOpts, payload.Context)
 		if err != nil {
-			writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("推理失败: %v", err))
+			writeJSONError(w, r, t0, targetModel, http.StatusInternalServerError, fmt.Sprintf("推理失败: %v", err))
 			return
 		}
 
 		writeJSON(w, http.StatusOK, res)
+		logServerAccess(r, http.StatusOK, time.Since(t0), targetModel, fmt.Sprintf("选择: %s (置信度=%.3f, cache: %s)", res.Choice, res.Confidence, cacheTag(res.Cached)))
 	})
 
 	// 4. POST /v1/score - 单条分级打分快捷接口
 	mux.HandleFunc("/v1/score", func(w http.ResponseWriter, r *http.Request) {
+		t0 := time.Now()
 		if r.Method != http.MethodPost {
-			writeJSONError(w, http.StatusMethodNotAllowed, "只支持 POST 方法")
+			writeJSONError(w, r, t0, "", http.StatusMethodNotAllowed, "只支持 POST 方法")
 			return
 		}
 
@@ -296,7 +313,7 @@ func RunServer(opts ServerOptions) error {
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("JSON 请求体解析失败: %v", err))
+			writeJSONError(w, r, t0, "", http.StatusBadRequest, fmt.Sprintf("JSON 请求体解析失败: %v", err))
 			return
 		}
 
@@ -307,7 +324,7 @@ func RunServer(opts ServerOptions) error {
 		imgs = append(imgs, payload.Images...)
 
 		if strings.TrimSpace(payload.Rubrics) == "" || (strings.TrimSpace(payload.Context) == "" && len(imgs) == 0) {
-			writeJSONError(w, http.StatusBadRequest, "rubrics 为必填字段，且 context 与 image/images 至少需提供一项")
+			writeJSONError(w, r, t0, "", http.StatusBadRequest, "rubrics 为必填字段，且 context 与 image/images 至少需提供一项")
 			return
 		}
 
@@ -316,11 +333,11 @@ func RunServer(opts ServerOptions) error {
 		if err := json.Unmarshal(payload.Levels, &levelsStr); err == nil {
 			parsedLevels, err = engine.ParseScoreFlag(levelsStr)
 			if err != nil {
-				writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("解析 levels 字符串失败: %v", err))
+				writeJSONError(w, r, t0, "", http.StatusBadRequest, fmt.Sprintf("解析 levels 字符串失败: %v", err))
 				return
 			}
 		} else if err := json.Unmarshal(payload.Levels, &parsedLevels); err != nil {
-			writeJSONError(w, http.StatusBadRequest, "levels 必须为逗号分隔字符串或字符串数组")
+			writeJSONError(w, r, t0, "", http.StatusBadRequest, "levels 必须为逗号分隔字符串或字符串数组")
 			return
 		}
 
@@ -329,7 +346,12 @@ func RunServer(opts ServerOptions) error {
 			targetModel = payload.Model
 		}
 
-		rm, _ := infra.ResolveModel(cfg, targetModel)
+		rm, err := infra.ResolveModel(cfg, targetModel)
+		if err != nil {
+			writeJSONError(w, r, t0, targetModel, http.StatusBadRequest, fmt.Sprintf("解析模型失败: %v", err))
+			return
+		}
+
 		temp := 1.0
 		tempChanged := false
 		if payload.Temperature != nil {
@@ -362,27 +384,37 @@ func RunServer(opts ServerOptions) error {
 
 		res, err := engine.EvaluateSingleScore(cfg, store, scoreOpts, payload.Context)
 		if err != nil {
-			writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("推理失败: %v", err))
+			writeJSONError(w, r, t0, targetModel, http.StatusInternalServerError, fmt.Sprintf("推理失败: %v", err))
 			return
 		}
 
 		writeJSON(w, http.StatusOK, res)
+		logServerAccess(r, http.StatusOK, time.Since(t0), targetModel, fmt.Sprintf("打分: %s (期望均值=%.2f, cache: %s)", res.TopLabel, res.Score, cacheTag(res.Cached)))
 	})
 
 	// 5. GET /health - 健康检查
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		t0 := time.Now()
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":        "ok",
 			"default_model": modelName,
 			"config_path":   cfgPath,
 			"time":          time.Now().Format(time.RFC3339),
 		})
+		logServerAccess(r, http.StatusOK, time.Since(t0), modelName, "ok")
 	})
 
 	addr := net.JoinHostPort(opts.Host, strconv.Itoa(opts.Port))
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		if strings.Contains(err.Error(), "address already in use") {
+			return fmt.Errorf("HTTP 服务启动失败: 端口 %d 已被占用。\n建议操作:\n  1. 使用 --port <新端口> 指定可用端口 (例如: decision-cli serve --port %d);\n  2. 或运行 `lsof -i :%d` 检查并终止占用进程。", opts.Port, opts.Port+1, opts.Port)
+		}
+		return fmt.Errorf("HTTP 服务监听失败 (%s): %w", addr, err)
+	}
+
 	server := &http.Server{
-		Addr:    addr,
-		Handler: mux,
+		Handler: corsMiddleware(mux),
 	}
 
 	fmt.Fprintf(os.Stderr, "🚀 decision-cli SystemOne API 服务已启动\n")
@@ -397,7 +429,7 @@ func RunServer(opts ServerOptions) error {
 	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			fmt.Fprintf(os.Stderr, "HTTP 服务异常退出: %v\n", err)
 		}
 	}()
@@ -410,13 +442,59 @@ func RunServer(opts ServerOptions) error {
 	return server.Shutdown(ctx)
 }
 
+// corsMiddleware 为本地 API 请求添加标准 CORS 响应头并处理 OPTIONS 预检请求
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept")
+		w.Header().Set("Access-Control-Max-Age", "86400")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			logServerAccess(r, http.StatusNoContent, 0, "-", "CORS preflight")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func cacheTag(cached bool) string {
+	if cached {
+		return "HIT"
+	}
+	return "MISS"
+}
+
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil && host != "" {
+		return host
+	}
+	return r.RemoteAddr
+}
+
+func logServerAccess(r *http.Request, statusCode int, duration time.Duration, model string, summary string) {
+	ts := time.Now().Format("15:04:05")
+	ip := clientIP(r)
+	modelTag := model
+	if modelTag == "" {
+		modelTag = "-"
+	}
+	durMs := float64(duration.Microseconds()) / 1000.0
+	fmt.Fprintf(os.Stderr, "[%s] %-4s %-16s %d %6.1fms [%s] %s (%s)\n",
+		ts, r.Method, r.URL.Path, statusCode, durMs, modelTag, summary, ip)
+}
+
 func writeJSON(w http.ResponseWriter, statusCode int, data any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(statusCode)
 	_ = json.NewEncoder(w).Encode(data)
 }
 
-func writeJSONError(w http.ResponseWriter, statusCode int, message string) {
+func writeJSONError(w http.ResponseWriter, r *http.Request, t0 time.Time, model string, statusCode int, message string) {
+	logServerAccess(r, statusCode, time.Since(t0), model, "错误: "+message)
 	writeJSON(w, statusCode, map[string]any{
 		"error": message,
 	})

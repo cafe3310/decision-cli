@@ -73,3 +73,45 @@ func TestNounValidation(t *testing.T) {
 		t.Fatalf("期望缺少 --rubrics 时报错，但执行成功")
 	}
 }
+
+func TestModelsDownloadSubcommand(t *testing.T) {
+	rootCmd := NewRootCommand()
+	cmd, _, err := rootCmd.Find([]string{"models", "download"})
+	if err != nil || cmd == nil {
+		t.Fatalf("查找 models download 命令失败: %v", err)
+	}
+	if cmd.Name() != "download" {
+		t.Errorf("预期子命令为 download，实际为: %s", cmd.Name())
+	}
+}
+
+func TestValidationActionableErrors(t *testing.T) {
+	rootCmd := NewRootCommand()
+
+	testCases := []struct {
+		name string
+		args []string
+	}{
+		{"noun_missing_rubric", []string{"noun"}},
+		{"noun_missing_context", []string{"noun", "--rubrics", "测试"}},
+		{"choose_missing_choices", []string{"choose", "--rubrics", "测试", "--context", "测试"}},
+		{"score_missing_levels", []string{"score", "--rubrics", "测试", "--context", "测试"}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			rootCmd.SetOut(buf)
+			rootCmd.SetErr(buf)
+			rootCmd.SetArgs(tc.args)
+			err := rootCmd.Execute()
+			if err == nil {
+				t.Fatalf("用例 %s 预期执行失败但成功", tc.name)
+			}
+			errStr := err.Error()
+			if !bytes.Contains([]byte(errStr), []byte("建议操作")) && !bytes.Contains([]byte(errStr), []byte("正确示例")) {
+				t.Errorf("用例 %s 报错缺少下一步行动建议: %s", tc.name, errStr)
+			}
+		})
+	}
+}

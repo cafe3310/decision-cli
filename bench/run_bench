@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# bench/run_bench: decision-cli 统一评测入口脚本
+# ==============================================================================
+# 支持自动调度 Python 虚拟环境与底层 CLI 执行各项基准评测。
+# ==============================================================================
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# 优先使用 decision-cli 专属的 MLX 虚拟环境，若不存在则回退至系统 python3
+VENV_PYTHON="${HOME}/.cache/decision-cli/venv/bin/python3"
+if [ -x "${VENV_PYTHON}" ]; then
+    PYTHON_BIN="${VENV_PYTHON}"
+else
+    PYTHON_BIN="$(which python3 || echo "python3")"
+fi
+
+export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH}"
+
+exec "${PYTHON_BIN}" -m bench.internal.runner "$@"

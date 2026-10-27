@@ -90,14 +90,21 @@ func EnsureManagedVenv(cfg *types.AppConfig) (string, error) {
 	if uvBin == "" {
 		uvBin = "uv"
 	}
-	if _, err := exec.LookPath(uvBin); err != nil {
+	foundUV := false
+	if _, err := exec.LookPath(uvBin); err == nil {
+		foundUV = true
+	} else {
 		// Check common uv locations on macOS
 		for _, cand := range []string{"/opt/homebrew/bin/uv", filepath.Join(config.ExpandPath("~"), ".local/bin/uv"), filepath.Join(config.ExpandPath("~"), ".cargo/bin/uv")} {
 			if _, sErr := os.Stat(cand); sErr == nil {
 				uvBin = cand
+				foundUV = true
 				break
 			}
 		}
+	}
+	if !foundUV {
+		return "", fmt.Errorf("未检测到 uv 工具（decision-cli 运行时强依赖 uv 管理自包含 Python 虚拟环境）。\n建议安装 uv 后重试：\n  brew install uv  # 或运行: curl -LsSf https://astral.sh/uv/install.sh | sh\n安装完成后运行: decision-cli setup")
 	}
 
 	if err := os.MkdirAll(filepath.Dir(expandedVenv), 0755); err != nil {
@@ -380,7 +387,74 @@ func ResolveModel(cfg *types.AppConfig, modelName string) (ResolvedModel, error)
 		LocalPath:    "",
 		Source:       "not_found",
 		CachedOnDisk: false,
-	}, fmt.Errorf("model %q (%s) not found in models.paths or models.scan_dirs %v", spec.Alias, spec.HFRepoID, cfg.Models.ScanDirs)
+	}, fmt.Errorf("未在本地找到模型 %q (%s)。\n当前已扫描路径:\n  - models.paths: %v\n  - models.scan_dirs: %v\n建议操作:\n  1. 运行 `decision-cli models` 查看当前已就绪的模型列表;\n  2. 运行 `decision-cli models download %s` (或 `huggingface-cli download %s`) 下载权重;\n  3. 或在 ~/.config/decision-cli/config.yaml 中的 models.paths[%q] 显式指定本地物理路径。",
+		spec.Alias, spec.HFRepoID, cfg.Models.Paths, cfg.Models.ScanDirs, spec.Alias, spec.HFRepoID, spec.Alias)
+}
+
+// DownloadModel 利用 huggingface-cli 下载指定模型权重到本地扫描目录，并返回解析后的本地物理路径
+func DownloadModel(cfg *types.AppConfig, modelArg string) (string, string, error) {
+	var repoID, alias string
+	if spec, ok := cfg.Models.Registry[modelArg]; ok {
+		alias = spec.Alias
+		repoID = spec.HFRepoID
+	} else {
+		for _, s := range cfg.Models.Registry {
+			if strings.EqualFold(s.HFRepoID, modelArg) || strings.EqualFold(s.Alias, modelArg) {
+				alias = s.Alias
+				repoID = s.HFRepoID
+				break
+			}
+		}
+	}
+	if repoID == "" {
+		alias = modelArg
+		repoID = modelArg
+	}
+
+	// 检查是否已经就绪
+	if rm, err := ResolveModel(cfg, modelArg); err == nil && rm.CachedOnDisk && rm.LocalPath != "" {
+		return alias, rm.LocalPath, nil
+	}
+
+	// 查找 huggingface-cli
+	hfCli := "huggingface-cli"
+	found := false
+	if _, err := exec.LookPath(hfCli); err == nil {
+		found = true
+	} else {
+		for _, cand := range []string{
+			"/opt/homebrew/bin/huggingface-cli",
+			filepath.Join(config.ExpandPath("~"), ".local/bin/huggingface-cli"),
+			filepath.Join(config.ExpandPath("~/.cache/decision-cli/venv/bin"), "huggingface-cli"),
+		} {
+			if _, err := os.Stat(cand); err == nil {
+				hfCli = cand
+				found = true
+				break
+			}
+		}
+	}
+
+	if !found {
+		return alias, "", fmt.Errorf("未检测到 huggingface-cli 工具。\n建议安装方案：\n  brew install huggingface-cli  # 或运行: uv tool install huggingface_hub[cli]\n安装完成后重新执行: decision-cli models download %s", alias)
+	}
+
+	fmt.Fprintf(os.Stderr, "📥 正在通过 %s 下载模型权重: %s (别名: %s)...\n", hfCli, repoID, alias)
+	cmd := exec.Command(hfCli, "download", repoID)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		return alias, "", fmt.Errorf("模型权重下载失败: %w", err)
+	}
+
+	// 重新解析模型路径
+	rm, err := ResolveModel(cfg, modelArg)
+	if err != nil || !rm.CachedOnDisk {
+		return alias, "", fmt.Errorf("模型已下载，但未在 scan_dirs 中扫描到有效结构，请检查 ~/.cache/huggingface/hub 是否在 scan_dirs 配置中")
+	}
+
+	return alias, rm.LocalPath, nil
 }
 
 func findLatestSnapshot(hfRepoRoot string) string {

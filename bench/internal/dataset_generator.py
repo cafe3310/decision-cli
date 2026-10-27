@@ -1,0 +1,254 @@
+"""Dataset Generator for decision-cli Benchmarks.
+
+Generates intermediate test cases and evaluation batches on-the-fly,
+eliminating the need for static testdata files.
+"""
+
+from typing import Dict, Any, List
+
+
+def get_path_a_benchmark_data() -> Dict[str, Any]:
+    """Returns the Path A multi-class (choice) and ordinal rubric (score) dataset."""
+    return {
+        "title": "Path A Multi-Class (choice) & Ordinal Rubric (score) Benchmark Suite",
+        "choice_task": {
+            "rubrics": "判断该用户反馈最符合哪一个核心业务意图类别",
+            "choices": [
+                {"key": "docs", "description": "文档开发、API参数说明、部署教程或Cookbook示例诉求"},
+                {"key": "quant_local", "description": "本地量化权重（GGUF/MLX/AWQ/FP8）或终端推理工具（Ollama/LM Studio/llama.cpp）适配诉求"},
+                {"key": "bug_quality", "description": "模型输出质量异常（乱码/标签格式错误）、API报错（500/429限流）或系统故障"},
+                {"key": "finetune", "description": "模型微调训练脚本或训练框架（LLaMA-Factory/LoRA/SFT）适配诉求"},
+                {"key": "business", "description": "企业商业采购询价、私有化合规部署授权或第三方平台生态合作意向"},
+                {"key": "general_chat", "description": "社区单纯夸奖、模型横评对比、普通开源协议咨询或无明确开发诉求的闲聊"},
+            ],
+            "cases": [
+                {
+                    "id": "mc-01-api-guide",
+                    "expected": "docs",
+                    "context": "用户表达：README 里面只有模型权重下载链接，缺少 vLLM 和 SGLang 的启动参数说明和 API 调用示例。建议动作：补充推理框架部署文档与 OpenAI 兼容接口调用示例。",
+                },
+                {
+                    "id": "mc-02-cookbook",
+                    "expected": "docs",
+                    "context": "用户表达：想在开发板上跑 Ling-3.0-tiny，但不知道怎么配环境和量化参数，官方能不能出一个从零开始的图文部署案例或者 Cookbook？",
+                },
+                {
+                    "id": "mc-03-praise",
+                    "expected": "general_chat",
+                    "context": "用户表达：这模型实在太快了！家用的 8G 显卡开 128k 上下文能跑 100 多 token/s，完美平替 gemini flash！",
+                },
+                {
+                    "id": "mc-04-garbled-output",
+                    "expected": "bug_quality",
+                    "context": "用户表达：按照官方教程拉起模型后，生成长代码时经常出现中英文夹杂乱码，而且 MTP 开启后 thinking 标签格式不对。",
+                },
+                {
+                    "id": "mc-05-gguf-mlx",
+                    "expected": "quant_local",
+                    "context": "用户表达：开发者询问何时发布 Ling-3.1-flash 的 GGUF 和 Apple Silicon MLX 4-bit 量化版本，以便在 Mac Studio 和 Ollama 上本地运行。",
+                },
+                {
+                    "id": "mc-06-llama-cpp",
+                    "expected": "quant_local",
+                    "context": "用户表达：目前 llama.cpp 还没有合并 BailingMoeV2 架构的 PR，导致无法直接转换 GGUF 在本地 CPU+GPU 混合推理。",
+                },
+                {
+                    "id": "mc-07-rate-limit-429",
+                    "expected": "bug_quality",
+                    "context": "用户表达：在 ZenMux 平台上调用在线免费 API 时频繁遇到 429 Rate Limit 报错，而且偶尔网关返回 502 Bad Gateway。",
+                },
+                {
+                    "id": "mc-08-lora-factory",
+                    "expected": "finetune",
+                    "context": "用户表达：询问 LLaMA-Factory 和 ms-swift 什么时候支持 Ling-3.0 的 LoRA 微调训练脚本与 chat template。",
+                },
+                {
+                    "id": "mc-09-bank-procurement",
+                    "expected": "business",
+                    "context": "用户表达：某欧洲金融机构架构师发来邮件，希望评估 Ling-3.0-flash-fin 在合规投研场景的私有化授权费用与 SLA 保障方案。",
+                },
+                {
+                    "id": "mc-10-openrouter-partner",
+                    "expected": "business",
+                    "context": "用户表达：OpenRouter 与 KiloCode 团队询问能否作为 Day-0 合作伙伴接入 Ling-3.1-flash 官方 API 节点并联合宣发。",
+                },
+                {
+                    "id": "mc-11-student-license",
+                    "expected": "general_chat",
+                    "context": "用户表达：普通学生在微信群里问这个模型的 Apache 2.0 开源协议能不能用于大学毕业设计比赛。",
+                },
+                {
+                    "id": "mc-12-benchmark-chat",
+                    "expected": "general_chat",
+                    "context": "用户表达：社区用户对比了 Ling-3.0-tiny 和 Qwen3.5-27B 在代码补全上的表现，认为小尺寸 MoE 在速度上有明显优势但复杂推理稍弱。",
+                },
+                {
+                    "id": "mc-13-spring-ai-doc",
+                    "expected": "docs",
+                    "context": "用户表达：外部 Java 开发者反馈目前缺少 Spring AI 与 LangChain4j 的接入文档说明，不知道 tool_choice 字段怎么传。",
+                },
+                {
+                    "id": "mc-14-hospital-onprem",
+                    "expected": "business",
+                    "context": "用户表达：我们是三甲医院信息科，计划在内网采购部署医疗大模型一体机，请问商务团队怎么对接报价？",
+                },
+                {
+                    "id": "mc-15-rlhf-verl",
+                    "expected": "finetune",
+                    "context": "用户表达：请问官方有没有提供基于 veRL 或 TRL 对该 MoE 模型做 GRPO 强化学习后训练的配置文件？",
+                },
+            ],
+        },
+        "score_task": {
+            "rubrics": "评估该用户反馈的业务紧急度、受阻严重程度与跟进优先级（0到4档）",
+            "score_levels": [
+                "纯正面夸奖、日常问候或无需跟进的社区分享",
+                "普通信息咨询（如询问开源协议或一般性问答，未受阻）",
+                "常规功能建议、文档补充或周边工具适配诉求",
+                "影响研发进度的功能缺陷、生成质量异常或高价值企业商务合作线索",
+                "生产环境严重故障中断、连续报错不可用或情绪强烈要求立即处理",
+            ],
+            "cases": [
+                {
+                    "id": "sc-01-praise",
+                    "expected_level": 0,
+                    "context": "这模型实在太快了！家用的 8G 显卡开 128k 上下文能跑 100 多 token/s，给团队点赞！",
+                },
+                {
+                    "id": "sc-02-chat",
+                    "expected_level": 0,
+                    "context": "大家周末愉快，分享一下我今天用这个模型写的一首小诗。",
+                },
+                {
+                    "id": "sc-03-license",
+                    "expected_level": 1,
+                    "context": "请问这个模型的 Apache 2.0 开源协议可以用于参加学校的毕业设计比赛吗？",
+                },
+                {
+                    "id": "sc-04-param-question",
+                    "expected_level": 1,
+                    "context": "顺便问一下，这个模型默认的最大上下文窗口是 64k 还是 128k？",
+                },
+                {
+                    "id": "sc-05-doc-request",
+                    "expected_level": 2,
+                    "context": "希望能补充一份 vLLM 启动参数说明和 Python SDK 调用示例，方便新手快速上手。",
+                },
+                {
+                    "id": "sc-06-mlx-request",
+                    "expected_level": 2,
+                    "context": "建议官方后续发布一下 Apple Silicon MLX 4-bit 量化权重，方便 Mac 用户本地体验。",
+                },
+                {
+                    "id": "sc-07-garbled-bug",
+                    "expected_level": 3,
+                    "context": "开启 MTP 后生成长代码经常出现中英文乱码和 thinking 标签无法闭合，目前导致我们测试流跑不通。",
+                },
+                {
+                    "id": "sc-08-bank-lead",
+                    "expected_level": 3,
+                    "context": "我们是某股份制银行智能投研部，计划今年采购企业版私有化授权，希望本周内安排商务与架构师对接。",
+                },
+                {
+                    "id": "sc-09-prod-outage",
+                    "expected_level": 4,
+                    "context": "线上生产环境 API 已经连续挂了两个小时了，所有请求全部返回 500 Internal Server Error，业务完全停摆，请马上排查恢复！",
+                },
+                {
+                    "id": "sc-10-double-charge-angry",
+                    "expected_level": 4,
+                    "context": "充值余额被扣了两次，同时账户被无故封禁无法调用 API，技术支持完全不回邮件，限你们两小时内退款并恢复！",
+                },
+            ],
+        },
+    }
+
+
+def get_mini_bench_data() -> List[Dict[str, Any]]:
+    """Returns the 12-item Chinese binary mini-benchmark dataset."""
+    return [
+        {
+            "id": "doc-01-api-guide",
+            "rubrics": "判断这些文本是否代表文档开发、API说明、教程或接入指南相关的需求",
+            "expected": "是",
+            "category": "A-文档诉求(显式正例)",
+            "context": "用户表达：README 里面只有模型权重下载链接，缺少 vLLM 和 SGLang 的启动参数说明和 API 调用示例。建议动作：补充推理框架部署文档与 OpenAI 兼容接口调用示例。",
+        },
+        {
+            "id": "doc-02-cookbook-request",
+            "rubrics": "判断这些文本是否代表文档开发、API说明、教程或接入指南相关的需求",
+            "expected": "是",
+            "category": "A-文档诉求(隐式教程正例)",
+            "context": "用户表达：想在开发板上跑 Ling-3.0-tiny，但不知道怎么配环境和量化参数，官方能不能出一个从零开始的图文部署案例或者 Cookbook？",
+        },
+        {
+            "id": "doc-03-pure-praise-noise",
+            "rubrics": "判断这些文本是否代表文档开发、API说明、教程或接入指南相关的需求",
+            "expected": "否",
+            "category": "A-文档诉求(纯夸奖负例)",
+            "context": "用户表达：这模型实在太快了！家用的 8G 显卡开 128k 上下文能跑 100 多 token/s，完美平替 gemini flash！",
+        },
+        {
+            "id": "doc-04-weights-bug-trap",
+            "rubrics": "判断这些文本是否代表文档开发、API说明、教程或接入指南相关的需求",
+            "expected": "否",
+            "category": "A-文档诉求(近邻干扰：权重乱码报错而非文档缺失)",
+            "context": "用户表达：按照官方教程拉起模型后，生成长代码时经常出现中英文夹杂乱码，而且 MTP 开启后 thinking 标签格式不对。",
+        },
+        {
+            "id": "quant-05-gguf-mlx",
+            "rubrics": "判断这些文本是否代表本地量化权重（GGUF/MLX/AWQ/FP8）或终端推理工具（Ollama/LM Studio/llama.cpp）适配的需求",
+            "expected": "是",
+            "category": "B-量化与终端适配(正例)",
+            "context": "用户表达：开发者询问何时发布 Ling-3.1-flash 的 GGUF 和 Apple Silicon MLX 4-bit 量化版本，以便在 Mac Studio 和 Ollama 上本地运行。",
+        },
+        {
+            "id": "quant-06-llama-cpp-pr",
+            "rubrics": "判断这些文本是否代表本地量化权重（GGUF/MLX/AWQ/FP8）或终端推理工具（Ollama/LM Studio/llama.cpp）适配的需求",
+            "expected": "是",
+            "category": "B-量化与终端适配(架构支持正例)",
+            "context": "用户表达：目前 llama.cpp 还没有合并 BailingMoeV2 架构的 PR，导致无法直接转换 GGUF 在本地 CPU+GPU 混合推理。",
+        },
+        {
+            "id": "quant-07-cloud-api-rate-limit",
+            "rubrics": "判断这些文本是否代表本地量化权重（GGUF/MLX/AWQ/FP8）或终端推理工具（Ollama/LM Studio/llama.cpp）适配的需求",
+            "expected": "否",
+            "category": "B-量化与终端适配(近邻干扰：云端API限流而非本地部署)",
+            "context": "用户表达：在 ZenMux 平台上调用在线免费 API 时频繁遇到 429 Rate Limit 报错，希望提高并发配额。",
+        },
+        {
+            "id": "quant-08-finetune-lora",
+            "rubrics": "判断这些文本是否代表本地量化权重（GGUF/MLX/AWQ/FP8）或终端推理工具（Ollama/LM Studio/llama.cpp）适配的需求",
+            "expected": "否",
+            "category": "B-量化与终端适配(近邻干扰：训练微调诉求)",
+            "context": "用户表达：询问 LLaMA-Factory 什么时候支持 Ling-3.0 的 LoRA 微调训练脚本。",
+        },
+        {
+            "id": "biz-09-bank-procurement",
+            "rubrics": "判断这些文本是否包含商业采购、企业私有化落地合作或第三方平台生态集成意向",
+            "expected": "是",
+            "category": "C-商业与生态合作(企业采购正例)",
+            "context": "用户表达：某欧洲金融机构架构师发来邮件，希望评估 Ling-3.0-flash-fin 在合规投研场景的私有化授权费用与 SLA 保障方案。",
+        },
+        {
+            "id": "biz-10-platform-integration",
+            "rubrics": "判断这些文本是否包含商业采购、企业私有化落地合作或第三方平台生态集成意向",
+            "expected": "是",
+            "category": "C-商业与生态合作(平台集成正例)",
+            "context": "用户表达：OpenRouter 与 KiloCode 团队询问能否作为 Day-0 合作伙伴接入 Ling-3.1-flash 官方 API 节点并联合宣发。",
+        },
+        {
+            "id": "biz-11-individual-question",
+            "rubrics": "判断这些文本是否包含商业采购、企业私有化落地合作或第三方平台生态集成意向",
+            "expected": "否",
+            "category": "C-商业与生态合作(个人开发者普通提问负例)",
+            "context": "用户表达：普通学生在微信群里问这个模型的 Apache 2.0 开源协议能不能用于毕业设计比赛。",
+        },
+        {
+            "id": "biz-12-competitor-comparison",
+            "rubrics": "判断这些文本是否包含商业采购、企业私有化落地合作或第三方平台生态集成意向",
+            "expected": "否",
+            "category": "C-商业与生态合作(技术横评负例)",
+            "context": "用户表达：社区用户对比了 Ling-3.0-tiny 和 Qwen3.5-27B 在代码补全上的表现，认为小尺寸 MoE 在速度上有明显优势但复杂推理稍弱。",
+        },
+    ]

@@ -190,11 +190,11 @@ func newNounCommand(rootFlags *RootFlags) *cobra.Command {
     --context "用户反馈打开控制台白屏，附图如上"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if strings.TrimSpace(rubrics) == "" {
-				return fmt.Errorf("--rubrics 判定准则为必填参数")
+				return fmt.Errorf("缺少 --rubrics 判定准则。\n建议操作: 请使用 --rubrics 提供自然语言判定准则。\n正确示例: decision-cli noun --rubrics \"判断是否包含严重系统报错\" --context \"微信支付报错 5002\"")
 			}
 			parsedImages := normalizeImageArgs(images)
 			if strings.TrimSpace(context) == "" && len(parsedImages) == 0 {
-				return fmt.Errorf("--context 待评估文本或 --image 待评估图片至少需提供一项")
+				return fmt.Errorf("缺少待评估内容：--context 待评估文本或 --image 待评估图片至少需提供一项。\n正确示例 (纯文本): decision-cli noun --rubrics \"...\" --context \"待评估文本\"\n正确示例 (多模态): decision-cli noun --rubrics \"...\" --image ./screenshot.png")
 			}
 
 			cfg, _, _, err := config.LoadOrInit(rootFlags.ConfigPath)
@@ -300,14 +300,14 @@ func newChooseCommand(rootFlags *RootFlags) *cobra.Command {
     --debias-order`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if strings.TrimSpace(rubrics) == "" {
-				return fmt.Errorf("--rubrics 分类指导准则为必填参数")
+				return fmt.Errorf("缺少 --rubrics 分类指导准则。\n建议操作: 请使用 --rubrics 提供自然语言分类准则。\n正确示例: decision-cli choose --rubrics \"判断诉求类型\" --choices \"bug:故障,feat:新功能\" --context \"白屏报错\"")
 			}
 			parsedImages := normalizeImageArgs(images)
 			if strings.TrimSpace(context) == "" && len(parsedImages) == 0 {
-				return fmt.Errorf("--context 待评估文本或 --image 待评估图片至少需提供一项")
+				return fmt.Errorf("缺少待评估内容：--context 待评估文本或 --image 待评估图片至少需提供一项。\n正确示例: decision-cli choose --rubrics \"...\" --choices \"...\" --context \"待评估文本\"")
 			}
 			if strings.TrimSpace(choices) == "" {
-				return fmt.Errorf("--choices 候选类别集合为必填参数（格式如 \"key1:描述,key2:描述\"）")
+				return fmt.Errorf("缺少 --choices 候选类别集合。\n建议操作: 请使用逗号分隔各类别，冒号分隔键与描述。\n正确示例: --choices \"bug:系统故障,feat:新功能建议,ask:日常咨询\"")
 			}
 
 			parsedChoices, err := engine.ParseChoicesFlag(choices)
@@ -410,14 +410,14 @@ func newScoreCommand(rootFlags *RootFlags) *cobra.Command {
     --debias-order`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if strings.TrimSpace(rubrics) == "" {
-				return fmt.Errorf("--rubrics 评分指导准则为必填参数")
+				return fmt.Errorf("缺少 --rubrics 评分指导准则。\n建议操作: 请使用 --rubrics 提供自然语言评分准则。\n正确示例: decision-cli score --rubrics \"评估情绪激烈程度\" --levels \"平静,急躁,愤怒\" --context \"怎么回事？\"")
 			}
 			parsedImages := normalizeImageArgs(images)
 			if strings.TrimSpace(context) == "" && len(parsedImages) == 0 {
-				return fmt.Errorf("--context 待评估文本或 --image 待评估图片至少需提供一项")
+				return fmt.Errorf("缺少待评估内容：--context 待评估文本或 --image 待评估图片至少需提供一项。\n正确示例: decision-cli score --rubrics \"...\" --levels \"...\" --context \"待评估文本\"")
 			}
 			if strings.TrimSpace(levels) == "" {
-				return fmt.Errorf("--levels 等级刻度列表为必填参数（逗号分隔，如 \"平静,急躁,愤怒\"）")
+				return fmt.Errorf("缺少 --levels 等级刻度列表。\n建议操作: 请提供逗号分隔的升序等级刻度（支持 2 到 10 级）。\n正确示例: --levels \"完全平静,轻微焦躁,严重愤怒辱骂\"")
 			}
 
 			parsedLevels, err := engine.ParseScoreFlag(levels)
@@ -543,10 +543,10 @@ func newBatchNounCommand(rootFlags *RootFlags) *cobra.Command {
     --progress`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if strings.TrimSpace(rubrics) == "" {
-				return fmt.Errorf("--rubrics 判定准则为必填参数")
+				return fmt.Errorf("缺少 --rubrics 判定准则。\n建议操作: 请使用 --rubrics 提供自然语言判定准则。\n正确示例: decision-cli batch noun --rubrics \"判断是否涉及隐私泄露\" --input ./data.json")
 			}
 			if strings.TrimSpace(input) == "" {
-				return fmt.Errorf("--input 输入文件路径为必填参数（支持 .json, .jsonl, .yaml）")
+				return fmt.Errorf("缺少 --input 批量数据文件路径。\n建议操作: 请通过 --input 传入 .json, .jsonl 或 .yaml 数据文件。\n正确示例: decision-cli batch noun --rubrics \"...\" --input ./records.jsonl")
 			}
 
 			cfg, _, _, err := config.LoadOrInit(rootFlags.ConfigPath)
@@ -653,13 +653,13 @@ func newBatchChooseCommand(rootFlags *RootFlags) *cobra.Command {
     --debias-order`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if strings.TrimSpace(rubrics) == "" {
-				return fmt.Errorf("--rubrics 分类指导准则为必填参数")
+				return fmt.Errorf("缺少 --rubrics 分类指导准则。\n建议操作: 请使用 --rubrics 提供自然语言分类指导准则。\n正确示例: decision-cli batch choose --rubrics \"问题归因\" --choices \"ui:界面,backend:后端\" --input ./tickets.json")
 			}
 			if strings.TrimSpace(input) == "" {
-				return fmt.Errorf("--input 输入文件路径为必填参数（支持 .json, .jsonl, .yaml）")
+				return fmt.Errorf("缺少 --input 批量数据文件路径。\n建议操作: 请通过 --input 传入 .json, .jsonl 或 .yaml 数据文件。\n正确示例: decision-cli batch choose --rubrics \"...\" --choices \"...\" --input ./tickets.json")
 			}
 			if strings.TrimSpace(choices) == "" {
-				return fmt.Errorf("--choices 候选类别集合为必填参数（格式如 \"key1:描述,key2:描述\"）")
+				return fmt.Errorf("缺少 --choices 候选类别集合。\n建议操作: 请使用逗号分隔各类别，冒号分隔键与描述。\n正确示例: --choices \"bug:系统故障,feat:新功能建议,ask:日常咨询\"")
 			}
 
 			parsedChoices, err := engine.ParseChoicesFlag(choices)
@@ -771,13 +771,13 @@ func newBatchScoreCommand(rootFlags *RootFlags) *cobra.Command {
     --debias-order`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if strings.TrimSpace(rubrics) == "" {
-				return fmt.Errorf("--rubrics 评分指导准则为必填参数")
+				return fmt.Errorf("缺少 --rubrics 评分指导准则。\n建议操作: 请使用 --rubrics 提供自然语言评分准则。\n正确示例: decision-cli batch score --rubrics \"评估情绪\" --levels \"平静,急躁,愤怒\" --input ./data.json")
 			}
 			if strings.TrimSpace(input) == "" {
-				return fmt.Errorf("--input 输入文件路径为必填参数（支持 .json, .jsonl, .yaml）")
+				return fmt.Errorf("缺少 --input 批量数据文件路径。\n建议操作: 请通过 --input 传入 .json, .jsonl 或 .yaml 数据文件。\n正确示例: decision-cli batch score --rubrics \"...\" --levels \"...\" --input ./data.json")
 			}
 			if strings.TrimSpace(levels) == "" {
-				return fmt.Errorf("--levels 等级刻度列表为必填参数（逗号分隔，如 \"低,中,高\"）")
+				return fmt.Errorf("缺少 --levels 等级刻度列表。\n建议操作: 请提供逗号分隔的升序等级刻度（支持 2 到 10 级）。\n正确示例: --levels \"低风险,中风险,高风险\"")
 			}
 
 			parsedLevels, err := engine.ParseScoreFlag(levels)
@@ -1043,6 +1043,7 @@ func newModelsCommand(rootFlags *RootFlags) *cobra.Command {
 				if m.CachedOnDisk {
 					fmt.Printf("    物理路径 : %s (%s)\n", m.LocalPath, m.Source)
 				} else {
+					fmt.Printf("    下载提示 : 运行 decision-cli models download %s (或 huggingface-cli download %s)\n", m.Alias, m.Spec.HFRepoID)
 					fmt.Printf("    配置提示 : 可在 %s 中的 models.paths[%s] 配置物理路径或放置在 scan_dirs 目录下\n", cfgPath, m.Alias)
 				}
 			}
@@ -1050,6 +1051,39 @@ func newModelsCommand(rootFlags *RootFlags) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&format, "format", "table", "输出格式：table | json | yaml")
+	cmd.AddCommand(newModelsDownloadCommand(rootFlags))
+	return cmd
+}
+
+func newModelsDownloadCommand(rootFlags *RootFlags) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "download [model-name]",
+		Short: "通过 huggingface-cli 下载指定模型权重到本地扫描目录",
+		Long: `download 子命令解析目标模型的 Hugging Face 仓库 ID，
+调用 huggingface-cli 下载至本地 scan_dirs 目录，并打印下载后的具体物理路径。`,
+		Example: `  # 下载默认推荐的主力多模态模型 gemma-4-26b-a4b：
+  decision-cli models download gemma-4-26b-a4b
+
+  # 下载轻量备选模型 gemma-4-e4b：
+  decision-cli models download gemma-4-e4b`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, _, _, err := config.LoadOrInit(rootFlags.ConfigPath)
+			if err != nil {
+				return err
+			}
+			modelArg := args[0]
+			alias, localPath, err := infra.DownloadModel(cfg, modelArg)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("\n✅ 模型权重已就绪！\n")
+			fmt.Printf("   - 模型别名     : %s\n", alias)
+			fmt.Printf("   - 本地物理路径 : %s\n", localPath)
+			fmt.Printf("   - 使用示范     : decision-cli noun --model %s --rubrics \"是否符合要求\" --context \"待评估文本\"\n", alias)
+			return nil
+		},
+	}
 	return cmd
 }
 

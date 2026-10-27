@@ -1,0 +1,67 @@
+# decision-cli 网页内容判定助手 (Tampermonkey 油猴插件)
+
+基于 macOS 本地 `decision-cli` 决策模型（默认使用 `gemma-4-26b-a4b`），在任意网页上自由框选文本区域，通过自然语言判定标准（Rubrics）进行毫秒级单步二元判定（「是」/「否」与置信概率），并在网页高亮区域旁直观展示。
+
+---
+
+## 1. 核心特性
+
+- 🎯 **双重划选模式（批量拖拽标注 vs 连续自动判定）**：
+  - **📋 批量拖拽标注（Batch Drag & Annotate）**：
+    - 点击「批量拖拽标注」，在网页上连续框选多个目标区域（自动生成 `#1 待判定`、`#2 待判定`...，暂不触发模型推理）；
+    - 随时调整或选择判定准则，点击「**⚡️ 立即批量判定 (N 处待判)**」（或在选框遮罩上直接点击横幅按钮 / 按 `Enter` 键）；
+    - 并发发起所有待判定区域的推理请求，结果就地实时刷新并汇总统计；
+  - **⚡️ 连续自动判定（Continuous Auto-Infer）**：
+    - 划选区域松开鼠标左键立即自动触发模型推理，且选框模式持续保持，适合边浏览边即时探测；
+- 🗂 **优雅收起与展开状态**：
+  - 点击浮窗顶部 `▼` 按钮即可收起为极简微型药丸胶囊（展示服务连通绿点、Decision 徽标与当前准则标签）；
+  - 点击胶囊药丸任意位置平滑恢复完整控制面板；
+  - 展开与收起状态自动持久化记忆；
+- 📝 **开箱预置三大准则**：
+  1. `内容看起来似乎是广告`
+  2. `内容看起来像是软广告或推广`
+  3. `内容看起来具备典型的 ai 生成特征`
+  - 允许随时修改或输入任意自定义判定准则（自动记忆偏好）；
+- ⚡️ **单步前向概率读取**：直连本地常驻 `decision-cli serve`（监听 `http://127.0.0.1:8080/v1/noun`），单步前向提取目标 Logits 计算概率，毫秒级响应，并自动复用 SQLite 本地缓存；
+- 🏷 **就地高亮与概率徽章**：划选区域常驻边框高亮，右上角直观显示 `[是 98.5%]` 或 `[否 1.2%]`，悬浮可查看置信度、模型名与实际耗时；
+- 🛡 **无缝跨域与混合内容支持**：采用 `GM_xmlhttpRequest`，彻底规避现代浏览器在 HTTPS 网站访问本地 HTTP 的 Mixed Content 与 CORS 阻碍；同时 `decision-cli serve` 原生提供标准 CORS 响应头。
+
+---
+
+## 2. 安装与使用指南
+
+### 步骤 1：启动本地 decision-cli HTTP 服务
+在 macOS 终端中运行：
+```bash
+decision-cli serve
+```
+看到服务启动日志：
+```text
+🚀 decision-cli SystemOne API 服务已启动
+   - 监听地址 : http://127.0.0.1:8080
+   - 默认模型 : gemma-4-26b-a4b
+   - 核心端点 : POST http://127.0.0.1:8080/v1/systemone
+   - 快捷端点 : POST /v1/noun, /v1/choose, /v1/score
+   - 健康检查 : GET http://127.0.0.1:8080/health
+```
+
+### 步骤 2：安装油猴脚本
+1. 在 Chrome / Edge / Safari / Firefox 中安装 [Tampermonkey](https://www.tampermonkey.net/)（或 ScriptCat / Violentmonkey）；
+2. 打开 Tampermonkey 管理面板，点击「添加新脚本」；
+3. 将 [decision-highlighter.user.js](file:///Users/sipan/workspace/decision-cli/web/tampermonkey/decision-highlighter.user.js) 的完整代码复制并粘贴进去，按 `Cmd+S` / `Ctrl+S` 保存。
+
+### 步骤 3：在任意网页上使用
+1. 打开任意网页（如知乎、推特、新闻博客，或本地测试页 `open web/tampermonkey/test_page.html`）；
+2. 页面右下角将出现 **Decision 决策判定** 浮窗，状态指示灯为绿色 🟢 时表示已连接本地服务；
+3. 点击 **「🎯 标记区域」**，在网页上拖拽拉出一个矩形框（选中文本后自动高亮）；
+4. 点击选择预设准则（如「内容看起来似乎是广告」）或输入自定义准则；
+5. 点击 **「⚡️ 立即判定」**；
+6. 选框右上角即刻展示判定结论徽章（如 `[是 98.2%]`），鼠标悬浮可查看耗时与模型元数据！
+
+---
+
+## 3. 文件结构
+
+- `decision-highlighter.user.js`：油猴插件完整源码；
+- `test_page.html`：包含典型硬广、软文、AI特征与正常技术文本的离线测试验证页；
+- `README.md`：本使用说明。

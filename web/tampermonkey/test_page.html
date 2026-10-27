@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>decision-cli 浏览器划选判定插件测试验证页</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+      background: #f1f5f9;
+      color: #0f172a;
+      margin: 0;
+      padding: 40px 20px;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    header {
+      background: #ffffff;
+      padding: 24px 32px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 24px;
+      color: #1e293b;
+    }
+    .intro {
+      color: #64748b;
+      font-size: 14px;
+      margin: 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      border: 1px solid #e2e8f0;
+    }
+    .tag {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
+    .tag-ad { background: #fee2e2; color: #dc2626; }
+    .tag-soft { background: #fef3c7; color: #d97706; }
+    .tag-ai { background: #e0e7ff; color: #4338ca; }
+    .tag-normal { background: #dcfce7; color: #15803d; }
+    h2 {
+      font-size: 16px;
+      margin: 0 0 10px 0;
+      color: #0f172a;
+    }
+    p {
+      margin: 0 0 10px 0;
+      font-size: 13.5px;
+      color: #334155;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎯 decision-cli 网页划选判定测试页</h1>
+      <p class="intro">
+        本页面用于验证 <code>decision-highlighter.user.js</code> 油猴插件。
+        请确保已在终端执行 <code>decision-cli serve</code>。<br>
+        <b>两种操作模式：</b><br>
+        1. <b>📋 批量拖拽标注</b>：点击「批量拖拽标注」，在下方 4 组卡片上<b>依次连续框选</b>，标记出 <code>#1 待判定</code>、<code>#2 待判定</code>...，然后点击浮窗或顶部横幅中的「<b>⚡️ 立即批量判定</b>」（或直接按 <code>Enter</code> 键），一键批量完成所有卡片判定！<br>
+        2. <b>⚡️ 连续自动判定</b>：点击「连续自动判定」，拉框松开鼠标立即自动触发单步推理。
+      </p>
+    </header>
+
+    <div class="grid">
+      <!-- 样本 1：典型硬广告 -->
+      <div class="card" id="sample-hard-ad">
+        <span class="tag tag-ad">硬广告测试样本</span>
+        <h2>【限时爆款】9块9抢顶尖Python+AI实战全套教程！</h2>
+        <p>
+          原价 1999 元，今天前 50 名仅需 9.9 元！手把手带你掌握大模型微调、搞定副业变现，3天零基础接单，名额仅剩 3 个！点击下方链接立即锁定内部优惠券，错过今天再等一年！
+        </p>
+        <p style="color: #94a3b8; font-size: 12px;">建议准则：内容看起来似乎是广告</p>
+      </div>
+
+      <!-- 样本 2：典型软广告 / 商业植入 -->
+      <div class="card" id="sample-soft-ad">
+        <span class="tag tag-soft">软广种草测试样本</span>
+        <h2>熬夜写代码脱发严重？聊聊我坚持半年的内调私藏好物</h2>
+        <p>
+          很多群友问我最近每天高强度写代码到凌晨两点，为什么发际线还这么坚挺。其实之前洗头也是一抓一大把，后来三甲医院当皮肤科医生的表姐私下推荐我试了下植纯净控油小绿瓶。用了两个多月，头皮真的清爽很多，枕头上掉发肉眼可见变少了。想试试的朋友报暗号“程序员老李”还可以领一张专属减50元券。
+        </p>
+        <p style="color: #94a3b8; font-size: 12px;">建议准则：内容看起来像是软广告或推广</p>
+      </div>
+
+      <!-- 样本 3：典型 AI 生成特征文本 -->
+      <div class="card" id="sample-ai-gen">
+        <span class="tag tag-ai">AI 生成特征测试样本</span>
+        <h2>关于数字化转型浪潮下企业效能提升的深度思考</h2>
+        <p>
+          综上所述，在当今风云变幻的数字化浪潮中，企业效能的提升不仅是一个技术命题，更是一场深刻的组织变革。不难发现，唯有将前沿技术与业务场景深度融合，方能在瞬息万变的市场格局中立于不败之地。正如硬币的两面，机遇与挑战并存，这不仅为企业的未来发展指明了方向，更为我们构筑核心竞争力提供了不可或缺的底层支撑。
+        </p>
+        <p style="color: #94a3b8; font-size: 12px;">建议准则：内容看起来具备典型的 ai 生成特征</p>
+      </div>
+
+      <!-- 样本 4：正常技术探讨 / 客观事实 -->
+      <div class="card" id="sample-tech-news">
+        <span class="tag tag-normal">正常技术文本样本</span>
+        <h2>Go 语言中基于 Unix Domain Socket 的进程间通信实现</h2>
+        <p>
+          在本地架构设计中，Unix Domain Socket (UDS) 免去了 TCP 握手和本地回环网络栈的路由损耗。通过直接在文件系统创建 socket 文件，客户端与守护进程可进行纳秒级的字节流或数据报传输，在 macOS 与 Linux 生产环境中表现出极高的吞吐与稳定性。
+        </p>
+        <p style="color: #94a3b8; font-size: 12px;">建议准则：任何广告或软广准则（预期结果：否）</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 在独立测试时直接注入脚本运行 -->
+  <script src="./decision-highlighter.user.js"></script>
+</body>
+</html>

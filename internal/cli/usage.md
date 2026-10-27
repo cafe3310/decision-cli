@@ -349,7 +349,7 @@ decision-cli doctor
 decision-cli doctor --model gemma-4-26b-a4b
 ```
 
-### 2. `decision-cli models` — 模型探测与路径解析
+### 2. `decision-cli models` — 模型探测、路径解析与权重下载
 
 展示支持的模型配置、本地磁盘缓存状态（`READY` / `MISSING`）及解析来源：
 
@@ -357,6 +357,10 @@ decision-cli doctor --model gemma-4-26b-a4b
 decision-cli models
 # 输出 JSON 格式：
 decision-cli models --format json
+
+# 从零下载模型权重至本地 scan_dirs 扫描目录：
+decision-cli models download gemma-4-26b-a4b
+decision-cli models download gemma-4-e4b
 ```
 
 ### 3. `decision-cli cache` — SQLite 缓存管理
@@ -416,4 +420,23 @@ fi
 # 使用 jq 提取概率值：
 PROB=$(decision-cli noun --rubrics "是否包含技术疑问" --context "请问 Go 协程池怎么写" | jq '.probability')
 echo "技术问题概率: $PROB"
+```
+
+---
+
+## 六、完全卸载与痕迹清理
+
+若需完全移除应用及其配置与缓存：
+```bash
+# 1. 扫描并终止所有后台 MLX Worker 守护进程
+decision-cli kill
+
+# 2. 清除所有 SQLite 缓存数据库、Unix Socket 与自包含 Python 虚拟环境
+rm -rf ~/.cache/decision-cli
+
+# 3. 删除用户全局配置文件（可选）
+rm -rf ~/.config/decision-cli
+
+# 4. 删除已安装或编译的二进制执行文件
+rm -f /usr/local/bin/decision-cli bin/decision-cli
 ```
