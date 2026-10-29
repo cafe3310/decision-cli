@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>decision-cli tune — 交叉验证与校准报告</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d1117; color: #c9d1d9; padding: 28px; line-height: 1.6; }
+    .container { max-width: 960px; margin: 0 auto; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    h1 { color: #fff; margin-top: 0; font-size: 22px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+    .stat-box { background: #21262d; border-radius: 6px; padding: 12px 16px; border: 1px solid #30363d; }
+    .stat-val { font-size: 24px; font-weight: bold; color: #58a6ff; }
+    .stat-sub { font-size: 12px; color: #8b949e; }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+    th, td { border: 1px solid #30363d; padding: 10px 12px; text-align: left; }
+    th { background: #21262d; color: #fff; }
+    .badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; }
+    .badge-success { background: rgba(63,185,80,0.2); color: #3fb950; }
+    .badge-warning { background: rgba(210,153,34,0.2); color: #d29922; }
+    code { background: #21262d; padding: 2px 6px; border-radius: 4px; color: #ff7b72; font-family: monospace; }
+    .rec-box { background: rgba(88,166,255,0.1); border: 1px solid #58a6ff; border-radius: 6px; padding: 16px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>decision-cli tune — 离线分层五折交叉验证与概率校准报告</h1>
+      <p style="color:#8b949e; font-size:13px;">数据源: bench/results/mini_bench_results.json | 总样本: 36 (正例基率: 50.0%) | 约束: P&ge;75%, R&ge;75%</p>
+      
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-val">92.0%</div>
+          <div class="stat-sub">调优后查准率 (原 96.0%)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">100.0%</div>
+          <div class="stat-sub">调优后查全率 (原 81.7%)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">0.956</div>
+          <div class="stat-sub">调优后 F1 (原 0.869)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" style="color:#3fb950;">-15.2%</div>
+          <div class="stat-sub">Brier 误差变化 (越负越优)</div>
+        </div>
+      </div>
+
+      <h3>分折交叉验证明细</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Fold</th>
+            <th>默认基线 (τ=0.50)</th>
+            <th>调优后 (τ* + Platt)</th>
+            <th>拟合参数 (A, B)</th>
+            <th>达标情况</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+  <td>Fold 1</td>
+  <td>P: 80.0% | R: 100.0% | F1: 0.889 (Brier: 0.127)</td>
+  <td><strong>τ=0.19</strong> | P: 80.0% | R: 100.0% | F1: 0.889 (Brier: 0.127)</td>
+  <td><code>A=0.6547, B=0.7121</code></td>
+  <td><span class="badge badge-success">达标</span></td>
+</tr><tr>
+  <td>Fold 2</td>
+  <td>P: 100.0% | R: 75.0% | F1: 0.857 (Brier: 0.099)</td>
+  <td><strong>τ=0.24</strong> | P: 80.0% | R: 100.0% | F1: 0.889 (Brier: 0.059)</td>
+  <td><code>A=0.3260, B=0.1508</code></td>
+  <td><span class="badge badge-success">达标</span></td>
+</tr><tr>
+  <td>Fold 3</td>
+  <td>P: 100.0% | R: 100.0% | F1: 1.000 (Brier: 0.006)</td>
+  <td><strong>τ=0.31</strong> | P: 100.0% | R: 100.0% | F1: 1.000 (Brier: 0.021)</td>
+  <td><code>A=0.3029, B=0.1766</code></td>
+  <td><span class="badge badge-success">达标</span></td>
+</tr><tr>
+  <td>Fold 4</td>
+  <td>P: 100.0% | R: 66.7% | F1: 0.800 (Brier: 0.097)</td>
+  <td><strong>τ=0.27</strong> | P: 100.0% | R: 100.0% | F1: 1.000 (Brier: 0.077)</td>
+  <td><code>A=0.3110, B=0.0473</code></td>
+  <td><span class="badge badge-success">达标</span></td>
+</tr><tr>
+  <td>Fold 5</td>
+  <td>P: 100.0% | R: 66.7% | F1: 0.800 (Brier: 0.076)</td>
+  <td><strong>τ=0.31</strong> | P: 100.0% | R: 100.0% | F1: 1.000 (Brier: 0.059)</td>
+  <td><code>A=0.3048, B=0.1916</code></td>
+  <td><span class="badge badge-success">达标</span></td>
+</tr>
+        </tbody>
+      </table>
+
+      <div class="rec-box">
+        <h4 style="margin:0 0 8px 0; color:#58a6ff;">🎯 推荐生产部署参数</h4>
+        <code>--threshold 0.26 --calib-a 0.3799 --calib-b 0.2557</code>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

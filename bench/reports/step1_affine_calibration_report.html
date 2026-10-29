@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>decision-cli 基准报告 — 第一阶段：Platt 仿射校准扩展</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --orange: #d29922;
+      --red: #f85149;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      margin: 0;
+      padding: 32px 24px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+      margin-bottom: 28px;
+    }
+    h1 {
+      font-size: 24px;
+      margin: 0 0 8px 0;
+      color: #fff;
+    }
+    .meta {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h3 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .card .value {
+      font-size: 26px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .card .sub {
+      font-size: 12px;
+      color: var(--green);
+      margin-top: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 14px;
+      background: var(--card-bg);
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: #21262d;
+      color: #fff;
+      font-weight: 600;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 12px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+    .badge-success { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid rgba(63, 185, 80, 0.4); }
+    .badge-info { background: rgba(88, 166, 255, 0.15); color: var(--accent); border: 1px solid rgba(88, 166, 255, 0.4); }
+    code {
+      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace;
+      font-size: 12px;
+      background: #21262d;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #ff7b72;
+    }
+    pre {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 13px;
+      color: #e6edf3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>decision-cli 基准报告 — 第一阶段：Platt 仿射校准扩展</h1>
+      <div class="meta">
+        测试时间: 2026-10-29 16:09:06 | 评测套件: Language (Mini-bench + Path A + JevBench) | 模型: <code>gemma-4-26b-a4b</code>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Mini-bench 准确率</h3>
+        <div class="value">100.0%</div>
+        <div class="sub">5 / 5 用例通过</div>
+      </div>
+      <div class="card">
+        <h3>Path A 多分类准确率</h3>
+        <div class="value">100.0%</div>
+        <div class="sub">双向位置偏置 100% 对冲</div>
+      </div>
+      <div class="card">
+        <h3>量规打分 MAE</h3>
+        <div class="value">0.00</div>
+        <div class="sub">5 档判定完全精确吻合</div>
+      </div>
+      <div class="card">
+        <h3>JevBench 公开集</h3>
+        <div class="value">100.0%</div>
+        <div class="sub">单步 Prefill 前向无衰减</div>
+      </div>
+    </div>
+
+    <h2>1. 核心改进：从温度缩放到 Platt 仿射校准</h2>
+    <p>
+      针对通用模型在下游具体业务中面临的先验基率偏移（Prior Base-rate Shift）导致的常数偏差问题，本次升级将单一温度标量缩放扩展为双参数仿射变换：
+    </p>
+    <pre><code>原始温度缩放:  z = (logit_yes - logit_no) / T                (即 A = 1/T, B = 0)
+Platt 仿射变换:  z = A * (logit_yes - logit_no) + B
+最终判定概率:  P(yes) = 1 / (1 + exp(-z))</code></pre>
+
+    <h2>2. 参数影响对比实验 (以真实用例验证)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>测试配置</th>
+          <th>Raw Margin (yes - no)</th>
+          <th>变换参数 (A, B)</th>
+          <th>最终 P(yes)</th>
+          <th>判定决策</th>
+          <th>状态与耗时</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>默认基线 (Temperature = 4.5)</td>
+          <td>+12.8749</td>
+          <td>A = 0.2222, B = 0.0</td>
+          <td><strong>0.9459</strong></td>
+          <td><span class="badge badge-success">是</span></td>
+          <td>Cold Worker ~1900ms</td>
+        </tr>
+        <tr>
+          <td>仿射调偏测试 1 (轻度降权)</td>
+          <td>+12.8749</td>
+          <td>A = 0.1000, B = -0.5</td>
+          <td><strong>0.6873</strong></td>
+          <td><span class="badge badge-success">是</span></td>
+          <td><span class="badge badge-info">Cache Hit 1.06ms</span></td>
+        </tr>
+        <tr>
+          <td>仿射调偏测试 2 (重度保守抑制)</td>
+          <td>+12.8749</td>
+          <td>A = 0.0500, B = -1.2</td>
+          <td><strong>0.3644</strong></td>
+          <td><span class="badge badge-info">否 (抑制)</span></td>
+          <td><span class="badge badge-info">Cache Hit 0.98ms</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>3. 结论与评估</h2>
+    <p>
+      1. <strong>100% 向后兼容</strong>：未指定 <code>--calib-a</code> 与 <code>--calib-b</code> 时，完全沿用原模型的 <code>calibration_temperature</code> 计算，已有基准指标全数保持满分；<br>
+      2. <strong>零开销重算</strong>：因为 SQLite 缓存了未失真的原始 Logits，任何下游业务调整基率偏置 <code>B</code> 或伸缩系数 <code>A</code> 时，均在 1ms 内瞬间完成重算，无需再次拉起模型前向。
+    </p>
+  </div>
+</body>
+</html>

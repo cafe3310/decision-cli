@@ -722,6 +722,112 @@ def score_single_item(
         }
 
 
+def score_items_with_shared_prefix(
+    model_path: str,
+    model,
+    tokenizer,
+    prompt_style: str,
+    default_prim: str,
+    default_rubrics: str,
+    default_choices: list,
+    default_levels: list,
+    default_debias: bool,
+    pos_ids: list,
+    neg_ids: list,
+    items: list,
+    stream_stdout: bool = False,
+) -> list:
+    from mlx_lm.models.cache import make_prompt_cache
+
+    lm = model.language_model if hasattr(model, "language_model") else model
+    common_context = items[0].get("context", "")
+    prefix_prompt = f"<bos><start_of_turn>user\n【待评估背景材料 (Context)】\n{common_context}\n\n"
+    prefix_ids = tokenizer.encode(prefix_prompt, add_special_tokens=False)
+
+    base_cache = make_prompt_cache(lm)
+    _ = lm(mx.array([prefix_ids]), cache=base_cache)
+    mx.eval(*[s for c in base_cache for s in c.state if isinstance(s, mx.array)])
+
+    results = []
+    for item in items:
+        t0_item = time.perf_counter()
+        item_id = item.get("id", "")
+        prim = item.get("primitive") or default_prim
+        rubrics = item.get("rubrics") or default_rubrics
+        debias = item.get("debias_order") if "debias_order" in item else default_debias
+
+        if prim == "choice":
+            choices = item.get("choices") or default_choices
+
+            def run_choice_branch(ordered):
+                lines = []
+                for idx, c in enumerate(ordered):
+                    tag = TAG_POOL[idx]
+                    key = str(c.get("key", "")).strip()
+                    desc = str(c.get("description", "")).strip()
+                    lines.append(f"{tag}: {key} — {desc}" if desc and desc != key else f"{tag}: {key}")
+                opts_block = "\n".join(lines)
+                suffix = (
+                    f"【分类指令 (Instructions)】\n{rubrics}\n\n"
+                    f"【候选类别 (Criteria)】\n{opts_block}\n\n"
+                    "【最佳类别代号（仅回答单个字符代号）】<end_of_turn>\n<start_of_turn>model\n"
+                )
+                suffix_ids = tokenizer.encode(suffix, add_special_tokens=False)
+                b_cache = [type(c).from_state(c.state) for c in base_cache]
+                out = lm(mx.array([suffix_ids]), cache=b_cache)[0, -1, :]
+                lp = out - mx.logsumexp(out)
+                vals = {}
+                for idx, c in enumerate(ordered):
+                    tids = resolve_candidate_token_ids(tokenizer, [TAG_POOL[idx]])
+                    vals[str(c.get("key", ""))] = logsumexp([float(lp[tid].item()) for tid in tids])
+                sub_lse = logsumexp(list(vals.values()))
+                return {k: v - sub_lse for k, v in vals.items()}
+
+            pass1 = run_choice_branch(choices)
+            if debias and len(choices) >= 2:
+                pass2 = run_choice_branch(list(reversed(choices)))
+                merged = {k: 0.5 * (pass1[k] + pass2[k]) for k in pass1}
+                sub_lse = logsumexp(list(merged.values()))
+                opt_logits = {k: round(v - sub_lse, 6) for k, v in merged.items()}
+            else:
+                opt_logits = {k: round(v, 6) for k, v in pass1.items()}
+
+            res_obj = {
+                "id": item_id,
+                "primitive": "choice",
+                "option_logits": opt_logits,
+                "latency_ms": round((time.perf_counter() - t0_item) * 1000.0, 2),
+            }
+        else:
+            suffix = (
+                f"【判定准则 (Rubric)】\n{rubrics}\n\n"
+                "【判定结果（仅回答“是”或“否”）】<end_of_turn>\n<start_of_turn>model\n"
+            )
+            suffix_ids = tokenizer.encode(suffix, add_special_tokens=False)
+            b_cache = [type(c).from_state(c.state) for c in base_cache]
+            out = lm(mx.array([suffix_ids]), cache=b_cache)[0, -1, :]
+            log_probs = out - mx.logsumexp(out)
+            pos_vals = [float(log_probs[idx].item()) for idx in pos_ids]
+            neg_vals = [float(log_probs[idx].item()) for idx in neg_ids]
+            l_yes = logsumexp(pos_vals)
+            l_no = logsumexp(neg_vals)
+            res_obj = {
+                "id": item_id,
+                "primitive": "noul",
+                "logit_yes": round(l_yes, 6),
+                "logit_no": round(l_no, 6),
+                "margin": round(l_yes - l_no, 6),
+                "latency_ms": round((time.perf_counter() - t0_item) * 1000.0, 2),
+            }
+
+        results.append(res_obj)
+        if stream_stdout:
+            sys.stdout.write(json.dumps({"type": "item", "result": res_obj}, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
+
+    return results
+
+
 def handle_score_request(req: dict, stream_stdout: bool = False) -> dict:
     model_path = req["model_path"]
     prompt_style = req.get("prompt_style", "gemma4-binary")
@@ -753,6 +859,46 @@ def handle_score_request(req: dict, stream_stdout: bool = False) -> dict:
             json.dumps({"type": "status", "status": "scoring", "total": len(items)}, ensure_ascii=False) + "\n"
         )
         sys.stdout.flush()
+
+    common_context = items[0].get("context", "") if items else ""
+    is_shared_context = (
+        len(items) >= 2
+        and bool(common_context)
+        and len(common_context) >= 60
+        and not any(bool(it.get("images")) for it in items)
+        and all(it.get("context") == common_context for it in items)
+        and prompt_style in ("gemma4-binary",)
+    )
+
+    if is_shared_context:
+        try:
+            shared_results = score_items_with_shared_prefix(
+                model_path,
+                model,
+                tokenizer,
+                prompt_style,
+                default_prim,
+                default_rubrics,
+                default_choices,
+                default_levels,
+                default_debias,
+                pos_ids,
+                neg_ids,
+                items,
+                stream_stdout=stream_stdout,
+            )
+            return {
+                "ok": True,
+                "type": "done",
+                "mode": "shared_prefix_prefill",
+                "primitive": default_prim,
+                "model_path": model_path,
+                "pos_token_ids": pos_ids,
+                "neg_token_ids": neg_ids,
+                "results": shared_results,
+            }
+        except Exception as exc:
+            pass
 
     results = []
     for item in items:

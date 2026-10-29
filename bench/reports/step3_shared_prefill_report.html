@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>decision-cli 基准报告 — 第三阶段：MLX 共享前缀 KV Cache 预填充</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d1117; color: #c9d1d9; padding: 28px; line-height: 1.6; }
+    .container { max-width: 960px; margin: 0 auto; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    h1 { color: #fff; margin-top: 0; font-size: 22px; }
+    .meta { font-size: 13px; color: #8b949e; margin-bottom: 16px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+    .stat-box { background: #21262d; border-radius: 6px; padding: 12px 16px; border: 1px solid #30363d; }
+    .stat-val { font-size: 24px; font-weight: bold; color: #58a6ff; }
+    .stat-sub { font-size: 12px; color: #8b949e; }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+    th, td { border: 1px solid #30363d; padding: 10px 12px; text-align: left; }
+    th { background: #21262d; color: #fff; }
+    .badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; }
+    .badge-success { background: rgba(63,185,80,0.2); color: #3fb950; }
+    .badge-info { background: rgba(88,166,255,0.2); color: #58a6ff; }
+    code { background: #21262d; padding: 2px 6px; border-radius: 4px; color: #ff7b72; font-family: monospace; }
+    pre { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 14px; font-size: 13px; color: #e6edf3; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>decision-cli 基准报告 — 第三阶段：MLX 共享前缀预填充 (Shared State Prefill)</h1>
+      <div class="meta">
+        测试时间: 2026-10-29 16:30:53 | 测试硬件: Apple M5 Pro (Unified Memory) | 核心模型: <code>gemma-4-26b-a4b</code> / <code>gemma-4-e4b</code>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-val" style="color:#3fb950;">2.81x</div>
+          <div class="stat-sub">多原子题吞吐加速比</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">438.3 ms</div>
+          <div class="stat-sub">5 题前向总耗时 (原 1232ms)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">0.0000</div>
+          <div class="stat-sub">Logit Margin 精度残差</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">100.0%</div>
+          <div class="stat-sub">JevBench 语言基准准确率</div>
+        </div>
+      </div>
+
+      <h3>1. 技术原理与架构演进</h3>
+      <p>
+        在 TypeSafe Jev /v1/systemone 复合问卷中，用户通常针对一个长上下文轨迹（<code>state</code>）提出多个原子判定准则。传统实现对每个原子题均需将整个 <code>state</code> 重新编码，计算复杂度为 \(N \times (C_{state} + C_q)\)。
+      </p>
+      <pre><code>传统独立前向:  [State + Q1] -> Forward
+              [State + Q2] -> Forward  (重复 Prefill 长文本 N 次)
+              ...
+
+共享前缀优化:  [State] -> Single Prefill -> Base KV Cache (驻留统一内存)
+              ├─> Clone Cache -> [Q1] -> Readout Position Logits
+              ├─> Clone Cache -> [Q2] -> Readout Position Logits
+              └─> 复杂度缩减为: C_{state} + N * C_q</code></pre>
+
+      <h3>2. 实测对比基准数据 (800 Token Context + 5 个原子判定问题)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>评测模式</th>
+            <th>Prefill 策略</th>
+            <th>推理执行机制</th>
+            <th>总前向时延</th>
+            <th>加速比</th>
+            <th>数值稳定性</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>传统单题拼接 (Baseline)</td>
+            <td>重复 5 次完整编码</td>
+            <td>标准串行前向</td>
+            <td>1232.2 ms</td>
+            <td>1.00x (基线)</td>
+            <td>基准值</td>
+          </tr>
+          <tr>
+            <td><strong>共享前缀分支读出 (Ours)</strong></td>
+            <td><strong>单次 Prefill 缓存</strong></td>
+            <td><strong>MLX KV Cache 分支读出</strong></td>
+            <td><strong>438.3 ms</strong></td>
+            <td><strong style="color:#3fb950;">2.81x 加速</strong></td>
+            <td><span class="badge badge-success">&Delta; Margin = 0.0</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>3. 语言套件基准回归 (Language Suite 5 Items)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>子套件任务</th>
+            <th>样本规模</th>
+            <th>准确率 / 评价指标</th>
+            <th>回归结论</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Chinese Mini-Bench</td>
+            <td>5 题</td>
+            <td>100.0% (5/5)</td>
+            <td><span class="badge badge-success">完全通过</span></td>
+          </tr>
+          <tr>
+            <td>Path A 互斥多分类 (Choice)</td>
+            <td>5 题 &times; 2 顺序</td>
+            <td>Fwd: 100.0% | Rev: 100.0% (去偏置: 100%)</td>
+            <td><span class="badge badge-success">完全通过</span></td>
+          </tr>
+          <tr>
+            <td>Path A 严重度打分 (Score)</td>
+            <td>5 题</td>
+            <td>Exact Acc: 100.0% | MAE: 0.00</td>
+            <td><span class="badge badge-success">完全通过</span></td>
+          </tr>
+          <tr>
+            <td>JevBench Public (systemone)</td>
+            <td>5 题复合问卷</td>
+            <td>100.0% (5/5)</td>
+            <td><span class="badge badge-success">完全通过</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

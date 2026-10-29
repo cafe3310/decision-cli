@@ -282,21 +282,21 @@ func CalibrateScoreFromLogits(rawLogits map[string]float64, levels []string, tem
 	confidence = Round4(bestProb)
 	return expectedScore, normScore, topLevel, topLabel, confidence, probs, legend
 }
-// CalibrateFromLogits computes P(yes), confidence, and decision ("是"/"否") from raw logits,
-// temperature, and threshold.
-func CalibrateFromLogits(logitYes, logitNo, temperature, threshold float64) (prob float64, confidence float64, passed bool, decision string) {
-	if temperature <= 0 {
-		temperature = 1.0
-	}
+// CalibrateFromLogitsWithAffine computes P(yes), confidence, and decision ("是"/"否") from raw logits
+// using an affine Platt scaling transformation:
+//   scaled = calibA * (logitYes - logitNo) + calibB
+//   P(yes) = sigmoid(scaled)
+func CalibrateFromLogitsWithAffine(logitYes, logitNo, calibA, calibB, threshold float64) (prob float64, confidence float64, passed bool, decision string) {
 	if threshold <= 0 {
 		threshold = 0.5
 	}
-	margin := (logitYes - logitNo) / temperature
-	if margin >= 0 {
-		z := math.Exp(-margin)
+	margin := logitYes - logitNo
+	scaled := calibA*margin + calibB
+	if scaled >= 0 {
+		z := math.Exp(-scaled)
 		prob = 1.0 / (1.0 + z)
 	} else {
-		z := math.Exp(margin)
+		z := math.Exp(scaled)
 		prob = z / (1.0 + z)
 	}
 	passed = prob >= threshold
@@ -311,6 +311,15 @@ func CalibrateFromLogits(logitYes, logitNo, temperature, threshold float64) (pro
 		confidence = 1.0 - prob
 	}
 	return prob, confidence, passed, decision
+}
+
+// CalibrateFromLogits computes P(yes), confidence, and decision ("是"/"否") from raw logits,
+// temperature, and threshold (affine scaling with A = 1/temperature, B = 0).
+func CalibrateFromLogits(logitYes, logitNo, temperature, threshold float64) (prob float64, confidence float64, passed bool, decision string) {
+	if temperature <= 0 {
+		temperature = 1.0
+	}
+	return CalibrateFromLogitsWithAffine(logitYes, logitNo, 1.0/temperature, 0.0, threshold)
 }
 
 // Round4 rounds a float64 to 4 decimal places for clean output.

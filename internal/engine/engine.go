@@ -26,6 +26,8 @@ type Options struct {
 	DebiasOrder    bool
 	Threshold      float64
 	Temperature    float64
+	CalibA         *float64
+	CalibB         *float64
 	NoCache        bool
 	CacheOnly      bool
 	FilterPassed   bool
@@ -408,6 +410,24 @@ func EvaluateSingleScore(cfg *types.AppConfig, store *cache.Store, opts Options,
 	}, nil
 }
 
+// CalibrateDecision resolves either temperature-based or affine-based Platt calibration.
+func CalibrateDecision(logitYes, logitNo float64, opts Options) (prob, conf float64, passed bool, decision string) {
+	if opts.CalibA != nil || opts.CalibB != nil {
+		a := 1.0
+		if opts.CalibA != nil {
+			a = *opts.CalibA
+		} else if opts.Temperature > 0 {
+			a = 1.0 / opts.Temperature
+		}
+		b := 0.0
+		if opts.CalibB != nil {
+			b = *opts.CalibB
+		}
+		return cache.CalibrateFromLogitsWithAffine(logitYes, logitNo, a, b, opts.Threshold)
+	}
+	return cache.CalibrateFromLogits(logitYes, logitNo, opts.Temperature, opts.Threshold)
+}
+
 // EvaluateSingle evaluates a single (rubrics, context) pair with SQLite caching and MLX fallback.
 func EvaluateSingle(cfg *types.AppConfig, store *cache.Store, opts Options, contextText string) (*types.SingleDecisionResult, error) {
 	t0 := time.Now()
@@ -430,7 +450,7 @@ func EvaluateSingle(cfg *types.AppConfig, store *cache.Store, opts Options, cont
 		hits, err := store.GetBatch([]string{cKey})
 		if err == nil {
 			if entry, ok := hits[cKey]; ok {
-				prob, conf, passed, decision := cache.CalibrateFromLogits(entry.LogitYes, entry.LogitNo, opts.Temperature, opts.Threshold)
+				prob, conf, passed, decision := CalibrateDecision(entry.LogitYes, entry.LogitNo, opts)
 				elapsed := float64(time.Since(t0).Microseconds()) / 1000.0
 				return &types.SingleDecisionResult{
 					Decision:    decision,
@@ -439,6 +459,8 @@ func EvaluateSingle(cfg *types.AppConfig, store *cache.Store, opts Options, cont
 					Confidence:  cache.Round4(conf),
 					Threshold:   opts.Threshold,
 					Temperature: opts.Temperature,
+					CalibA:      opts.CalibA,
+					CalibB:      opts.CalibB,
 					Logits: types.LogitDetails{
 						Yes:    cache.Round4(entry.LogitYes),
 						No:     cache.Round4(entry.LogitNo),
@@ -483,7 +505,7 @@ func EvaluateSingle(cfg *types.AppConfig, store *cache.Store, opts Options, cont
 	}
 
 	r := resp.Results[0]
-	prob, conf, passed, decision := cache.CalibrateFromLogits(r.LogitYes, r.LogitNo, opts.Temperature, opts.Threshold)
+	prob, conf, passed, decision := CalibrateDecision(r.LogitYes, r.LogitNo, opts)
 
 	if !opts.NoCache && store != nil {
 		defaultProb, _, _, _ := cache.CalibrateFromLogits(r.LogitYes, r.LogitNo, 1.0, 0.5)
@@ -517,6 +539,8 @@ func EvaluateSingle(cfg *types.AppConfig, store *cache.Store, opts Options, cont
 		Confidence:  cache.Round4(conf),
 		Threshold:   opts.Threshold,
 		Temperature: opts.Temperature,
+		CalibA:      opts.CalibA,
+		CalibB:      opts.CalibB,
 		Logits: types.LogitDetails{
 			Yes:    cache.Round4(r.LogitYes),
 			No:     cache.Round4(r.LogitNo),
@@ -623,7 +647,7 @@ func EvaluateBatch(cfg *types.AppConfig, store *cache.Store, opts Options, items
 			resItem.Probabilities = probs
 			resItem.OptionLogits = roundLogitsMap(optLogits)
 		default:
-			prob, conf, passed, decision := cache.CalibrateFromLogits(logitYes, logitNo, opts.Temperature, opts.Threshold)
+			prob, conf, passed, decision := CalibrateDecision(logitYes, logitNo, opts)
 			resItem.Decision = decision
 			resItem.Passed = passed
 			resItem.Probability = cache.Round4(prob)
@@ -843,6 +867,8 @@ func EvaluateBatch(cfg *types.AppConfig, store *cache.Store, opts Options, items
 		DebiasedOrder: opts.DebiasOrder,
 		Threshold:     opts.Threshold,
 		Temperature:   opts.Temperature,
+		CalibA:        opts.CalibA,
+		CalibB:        opts.CalibB,
 		Summary:       summary,
 		Results:       results,
 	}, nil
@@ -1057,7 +1083,12 @@ func EvaluateSystemOne(cfg *types.AppConfig, store *cache.Store, baseOpts Option
 		if isCached && (pq.qType == "noul" || cEntry.RawLogitsJSON != "") {
 			switch pq.qType {
 			case "noul":
-				prob, _, _, _ := cache.CalibrateFromLogits(cEntry.LogitYes, cEntry.LogitNo, pq.temp, baseOpts.Threshold)
+				prob, _, _, _ := CalibrateDecision(cEntry.LogitYes, cEntry.LogitNo, Options{
+					Threshold:   baseOpts.Threshold,
+					Temperature: pq.temp,
+					CalibA:      baseOpts.CalibA,
+					CalibB:      baseOpts.CalibB,
+				})
 				p := cache.Round4(prob)
 				answers[pq.qID] = types.SystemOneAnswer{
 					Type:      "noul",
@@ -1102,7 +1133,12 @@ func EvaluateSystemOne(cfg *types.AppConfig, store *cache.Store, baseOpts Option
 
 		switch pq.qType {
 		case "noul":
-			prob, _, _, _ := cache.CalibrateFromLogits(fr.LogitYes, fr.LogitNo, pq.temp, baseOpts.Threshold)
+			prob, _, _, _ := CalibrateDecision(fr.LogitYes, fr.LogitNo, Options{
+				Threshold:   baseOpts.Threshold,
+				Temperature: pq.temp,
+				CalibA:      baseOpts.CalibA,
+				CalibB:      baseOpts.CalibB,
+			})
 			defProb, _, _, _ := cache.CalibrateFromLogits(fr.LogitYes, fr.LogitNo, 1.0, 0.5)
 			p := cache.Round4(prob)
 			answers[pq.qID] = types.SystemOneAnswer{

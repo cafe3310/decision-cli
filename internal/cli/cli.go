@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/cafe3310/decision-cli/internal/exporter"
 	"github.com/cafe3310/decision-cli/internal/infra"
 	"github.com/cafe3310/decision-cli/internal/server"
+	"github.com/cafe3310/decision-cli/internal/tuner"
 	"github.com/cafe3310/decision-cli/internal/types"
 	"github.com/spf13/cobra"
 )
@@ -108,6 +110,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.AddCommand(newDoctorCommand(&flags))
 	rootCmd.AddCommand(newModelsCommand(&flags))
 	rootCmd.AddCommand(newCacheCommand(&flags))
+	rootCmd.AddCommand(newTuneCommand(&flags))
 
 	return rootCmd
 }
@@ -166,6 +169,8 @@ func newNounCommand(rootFlags *RootFlags) *cobra.Command {
 		model       string
 		threshold   float64
 		temperature float64
+		calibA      float64
+		calibB      float64
 		format      string
 		output      string
 		noCache     bool
@@ -213,6 +218,18 @@ func newNounCommand(rootFlags *RootFlags) *cobra.Command {
 			effThresh := config.EffectiveThreshold(cfg, rm.Spec, threshold, cmd.Flags().Changed("threshold"))
 			effTemp := config.EffectivePrimitiveTemperature(cfg, rm.Spec, "noul", temperature, cmd.Flags().Changed("temperature"))
 
+			var ptrA, ptrB *float64
+			if cmd.Flags().Changed("calib-a") {
+				ptrA = &calibA
+			} else if rm.Spec.CalibA != nil {
+				ptrA = rm.Spec.CalibA
+			}
+			if cmd.Flags().Changed("calib-b") {
+				ptrB = &calibB
+			} else if rm.Spec.CalibB != nil {
+				ptrB = rm.Spec.CalibB
+			}
+
 			store, err := cache.Open(cfg.Cache.DBPath)
 			if err != nil {
 				return err
@@ -227,6 +244,8 @@ func newNounCommand(rootFlags *RootFlags) *cobra.Command {
 				ImageTokens: imageTokens,
 				Threshold:   effThresh,
 				Temperature: effTemp,
+				CalibA:      ptrA,
+				CalibB:      ptrB,
 				NoCache:     noCache,
 				CacheOnly:   cacheOnly,
 			}
@@ -246,6 +265,8 @@ func newNounCommand(rootFlags *RootFlags) *cobra.Command {
 	cmd.Flags().StringVar(&model, "model", "gemma-4-26b-a4b", "模型别名或物理路径（多模态支持：gemma-4-26b-a4b、gemma-4-e4b）")
 	cmd.Flags().Float64Var(&threshold, "threshold", 0.5, "判定为“是”的正向概率阈值（0.0 ~ 1.0）")
 	cmd.Flags().Float64Var(&temperature, "temperature", 1.0, "Logit 概率校准温度（> 0.0）")
+	cmd.Flags().Float64Var(&calibA, "calib-a", 0.0, "Platt 仿射校准缩放系数 A（未指定时默认使用 1/T）")
+	cmd.Flags().Float64Var(&calibB, "calib-b", 0.0, "Platt 仿射校准平移常数 B（未指定时默认为 0.0）")
 	cmd.Flags().StringVar(&format, "format", "json", "输出格式：json | yaml | compact | label-only")
 	cmd.Flags().StringVar(&output, "output", "", "结果保存文件路径（缺省输出至 stdout）")
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "跳过 SQLite 本地缓存读取与写入")
@@ -515,6 +536,8 @@ func newBatchNounCommand(rootFlags *RootFlags) *cobra.Command {
 		model           string
 		threshold       float64
 		temperature     float64
+		calibA          float64
+		calibB          float64
 		idField         string
 		contextTemplate string
 		imageField      string
@@ -565,6 +588,18 @@ func newBatchNounCommand(rootFlags *RootFlags) *cobra.Command {
 			effThresh := config.EffectiveThreshold(cfg, rm.Spec, threshold, cmd.Flags().Changed("threshold"))
 			effTemp := config.EffectivePrimitiveTemperature(cfg, rm.Spec, "noul", temperature, cmd.Flags().Changed("temperature"))
 
+			var ptrA, ptrB *float64
+			if cmd.Flags().Changed("calib-a") {
+				ptrA = &calibA
+			} else if rm.Spec.CalibA != nil {
+				ptrA = rm.Spec.CalibA
+			}
+			if cmd.Flags().Changed("calib-b") {
+				ptrB = &calibB
+			} else if rm.Spec.CalibB != nil {
+				ptrB = rm.Spec.CalibB
+			}
+
 			store, err := cache.Open(cfg.Cache.DBPath)
 			if err != nil {
 				return err
@@ -578,6 +613,8 @@ func newBatchNounCommand(rootFlags *RootFlags) *cobra.Command {
 				ImageTokens:    imageTokens,
 				Threshold:      effThresh,
 				Temperature:    effTemp,
+				CalibA:         ptrA,
+				CalibB:         ptrB,
 				NoCache:        noCache,
 				CacheOnly:      cacheOnly,
 				FilterPassed:   filterPassed,
@@ -604,6 +641,8 @@ func newBatchNounCommand(rootFlags *RootFlags) *cobra.Command {
 	cmd.Flags().StringVar(&model, "model", "gemma-4-26b-a4b", "模型别名或物理路径")
 	cmd.Flags().Float64Var(&threshold, "threshold", 0.5, "判定为“是”的正向概率阈值（0.0 ~ 1.0）")
 	cmd.Flags().Float64Var(&temperature, "temperature", 1.0, "Logit 概率校准温度")
+	cmd.Flags().Float64Var(&calibA, "calib-a", 0.0, "Platt 仿射校准缩放系数 A（未指定时默认使用 1/T）")
+	cmd.Flags().Float64Var(&calibB, "calib-b", 0.0, "Platt 仿射校准平移常数 B（未指定时默认为 0.0）")
 	cmd.Flags().StringVar(&idField, "id-field", "id", "输入数据中唯一主键字段名称")
 	cmd.Flags().StringVar(&contextTemplate, "context-template", "", "拼接多字段为 context 的 Go 模板字符串")
 	cmd.Flags().StringVar(&imageField, "image-field", "", "输入记录中图片路径字段名（缺省自动识别 images / image）")
@@ -866,6 +905,8 @@ func newSystemOneCommand(rootFlags *RootFlags) *cobra.Command {
 		rawImages       []string
 		imageTokens     int
 		temperature     float64
+		calibA          float64
+		calibB          float64
 		debiasOrder     bool
 		noCache         bool
 		cacheOnly       bool
@@ -903,12 +944,22 @@ func newSystemOneCommand(rootFlags *RootFlags) *cobra.Command {
 			}
 			defer store.Close()
 
+			var ptrA, ptrB *float64
+			if cmd.Flags().Changed("calib-a") {
+				ptrA = &calibA
+			}
+			if cmd.Flags().Changed("calib-b") {
+				ptrB = &calibB
+			}
+
 			baseOpts := engine.Options{
 				ModelName:   model,
 				Images:      parseImageFlagValues(rawImages),
 				ImageTokens: imageTokens,
 				DebiasOrder: debiasOrder,
 				Threshold:   0.5,
+				CalibA:      ptrA,
+				CalibB:      ptrB,
 				NoCache:     noCache,
 				CacheOnly:   cacheOnly,
 			}
@@ -927,6 +978,8 @@ func newSystemOneCommand(rootFlags *RootFlags) *cobra.Command {
 	cmd.Flags().StringArrayVar(&rawImages, "image", nil, "附加给本次复合请求的本地图片路径或 data:image Base64")
 	cmd.Flags().IntVar(&imageTokens, "image-tokens", 280, "单张图片分配的视觉 Soft Token 预算（70 | 140 | 280 | 560 | 1120）")
 	cmd.Flags().Float64Var(&temperature, "temperature", 0, "统一覆盖所有题目的校准温度")
+	cmd.Flags().Float64Var(&calibA, "calib-a", 0.0, "Platt 仿射校准缩放系数 A（未指定时默认使用 1/T）")
+	cmd.Flags().Float64Var(&calibB, "calib-b", 0.0, "Platt 仿射校准平移常数 B（未指定时默认为 0.0）")
 	cmd.Flags().BoolVar(&debiasOrder, "debias-order", false, "对 choice 与 score 题目执行正反序双向去偏置")
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "跳过 SQLite 本地缓存读取与写入")
 	cmd.Flags().BoolVar(&cacheOnly, "cache-only", false, "仅查本地缓存，不拉起模型推理")
@@ -1121,7 +1174,7 @@ func newCacheCommand(rootFlags *RootFlags) *cobra.Command {
 	statsCmd.Flags().StringVar(&statsFormat, "format", "json", "输出格式：json | yaml")
 
 	var expRubrics, expModel, expOutput, expFormat string
-	var expThreshold, expTemp float64
+	var expThreshold, expTemp, expCalibA, expCalibB float64
 	exportCmd := &cobra.Command{
 		Use:   "export",
 		Short: "将缓存的判定记录导出为 YAML 或 JSON 文件",
@@ -1139,6 +1192,15 @@ func newCacheCommand(rootFlags *RootFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			var ptrA, ptrB *float64
+			if cmd.Flags().Changed("calib-a") {
+				ptrA = &expCalibA
+			}
+			if cmd.Flags().Changed("calib-b") {
+				ptrB = &expCalibB
+			}
+
 			results := make([]types.BatchItemResult, 0, len(entries))
 			passedCount := 0
 			rejectedCount := 0
@@ -1146,7 +1208,22 @@ func newCacheCommand(rootFlags *RootFlags) *cobra.Command {
 				rm, _ := infra.ResolveModel(cfg, e.ModelID)
 				rowTemp := config.EffectiveTemperature(cfg, rm.Spec, expTemp, cmd.Flags().Changed("temperature"))
 				rowThresh := config.EffectiveThreshold(cfg, rm.Spec, expThreshold, cmd.Flags().Changed("threshold"))
-				prob, conf, passed, dec := cache.CalibrateFromLogits(e.LogitYes, e.LogitNo, rowTemp, rowThresh)
+
+				curA := ptrA
+				curB := ptrB
+				if curA == nil && rm.Spec.CalibA != nil {
+					curA = rm.Spec.CalibA
+				}
+				if curB == nil && rm.Spec.CalibB != nil {
+					curB = rm.Spec.CalibB
+				}
+
+				prob, conf, passed, dec := engine.CalibrateDecision(e.LogitYes, e.LogitNo, engine.Options{
+					Threshold:   rowThresh,
+					Temperature: rowTemp,
+					CalibA:      curA,
+					CalibB:      curB,
+				})
 				if passed {
 					passedCount++
 				} else {
@@ -1176,6 +1253,8 @@ func newCacheCommand(rootFlags *RootFlags) *cobra.Command {
 				Rubrics:     expRubrics,
 				Threshold:   expThreshold,
 				Temperature: expTemp,
+				CalibA:      ptrA,
+				CalibB:      ptrB,
 				Summary: types.BatchSummary{
 					Total:         len(results),
 					PassedCount:   passedCount,
@@ -1193,6 +1272,8 @@ func newCacheCommand(rootFlags *RootFlags) *cobra.Command {
 	exportCmd.Flags().StringVar(&expFormat, "format", "json", "输出格式：json | yaml | jsonl")
 	exportCmd.Flags().Float64Var(&expThreshold, "threshold", 0.5, "用于计算判定结论的概率阈值")
 	exportCmd.Flags().Float64Var(&expTemp, "temperature", 1.0, "用于计算校准概率的温度值")
+	exportCmd.Flags().Float64Var(&expCalibA, "calib-a", 0.0, "Platt 仿射校准缩放系数 A（未指定时默认使用 1/T）")
+	exportCmd.Flags().Float64Var(&expCalibB, "calib-b", 0.0, "Platt 仿射校准平移常数 B（未指定时默认为 0.0）")
 
 	var clrRubrics, clrModel string
 	clearCmd := &cobra.Command{
@@ -1333,4 +1414,279 @@ func newKillCommand(rootFlags *RootFlags) *cobra.Command {
 
 	return cmd
 }
+
+// =========================================================================
+// 离线交叉验证阈值与校准调优命令 (`decision-cli tune`)
+// =========================================================================
+
+func newTuneCommand(rootFlags *RootFlags) *cobra.Command {
+	var (
+		inputPath    string
+		labelField   string
+		minPrecision float64
+		minRecall    float64
+		beta         float64
+		folds        int
+		temperature  float64
+		format       string
+		outputPath   string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "tune",
+		Short: "基于已评测数据或缓存，零推理开销进行分层交叉验证阈值调优与 Platt 校准",
+		Long: `tune 子命令基于含有原始 Logits (或 logit margin) 和真值标签的 JSON/JSONL/YAML 数据文件，
+完全在本地离线执行分层五折交叉验证（Stratified 5-Fold Cross Validation）。
+根据业务要求的最低 Precision / Recall 门槛，在训练折上拟合 Platt 仿射校准参数 (A, B) 并搜索最优截断阈值，
+在验证折上对比默认基准 (0.50) 与调优后表现，输出最优生产部署参数与 Brier 分数改善幅度。`,
+		Example: `  # 在要求 P>=80%, R>=80% 条件下调优决策阈值：
+  decision-cli tune --input eval_results.json --min-precision 0.8 --min-recall 0.8
+
+  # 输出调优结果报告为 HTML 图表：
+  decision-cli tune --input eval_results.json --format html --output tune_report.html`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if strings.TrimSpace(inputPath) == "" && len(args) > 0 {
+				inputPath = args[0]
+			}
+			if strings.TrimSpace(inputPath) == "" {
+				return fmt.Errorf("缺少 --input 评测数据文件路径。\n示例: decision-cli tune --input eval_results.json --min-precision 0.8 --min-recall 0.8")
+			}
+
+			samples, err := tuner.LoadSamplesFromFile(inputPath, labelField)
+			if err != nil {
+				return fmt.Errorf("解析数据文件失败: %w", err)
+			}
+
+			cfg, _, _, err := config.LoadOrInit(rootFlags.ConfigPath)
+			if err != nil {
+				return err
+			}
+			defTemp := temperature
+			if !cmd.Flags().Changed("temperature") && cfg.DefaultTemperature > 0 {
+				defTemp = cfg.DefaultTemperature
+			}
+			if defTemp <= 0 {
+				defTemp = 4.5
+			}
+
+			opts := tuner.TuneOptions{
+				MinPrecision: minPrecision,
+				MinRecall:    minRecall,
+				Beta:         beta,
+				DefaultTemp:  defTemp,
+				NumFolds:     folds,
+			}
+
+			report, err := tuner.RunCrossValidation(samples, opts)
+			if err != nil {
+				return fmt.Errorf("交叉验证调优执行失败: %w", err)
+			}
+
+			if format == "json" || format == "yaml" {
+				return exporter.FormatAndWrite(report, format, outputPath)
+			} else if format == "html" {
+				htmlContent := generateTuneHTMLReport(report, inputPath, opts)
+				if outputPath != "" {
+					return os.WriteFile(outputPath, []byte(htmlContent), 0644)
+				}
+				fmt.Println(htmlContent)
+				return nil
+			}
+
+			// 默认打印人类可读终端报告
+			printTuneTerminalReport(report, inputPath, opts)
+			if outputPath != "" {
+				_ = exporter.FormatAndWrite(report, "json", outputPath)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVarP(&inputPath, "input", "i", "", "包含 logits 与标签的评测数据文件路径 (.json, .jsonl, .yaml)")
+	cmd.Flags().StringVar(&labelField, "label-field", "", "指定真值标签字段名（缺省自动匹配 label/target/expected/ground_truth）")
+	cmd.Flags().Float64Var(&minPrecision, "min-precision", 0.80, "业务最低查准率门槛 (Precision >= X)")
+	cmd.Flags().Float64Var(&minRecall, "min-recall", 0.80, "业务最低查全率门槛 (Recall >= X)")
+	cmd.Flags().Float64Var(&beta, "beta", 1.0, "F-beta 权重 (1.0 代表 F1，0.5 侧重查准率，2.0 侧重查全率)")
+	cmd.Flags().IntVar(&folds, "folds", 5, "分层交叉验证折数")
+	cmd.Flags().Float64Var(&temperature, "temperature", 4.5, "对比评估的默认基准温度 (如 Gemma 4 默认 4.5)")
+	cmd.Flags().StringVar(&format, "format", "table", "输出格式: table | json | yaml | html")
+	cmd.Flags().StringVar(&outputPath, "output", "", "保存报告文件路径 (可选)")
+
+	return cmd
+}
+
+func printTuneTerminalReport(rep *tuner.TuneReport, srcFile string, opts tuner.TuneOptions) {
+	fmt.Println("================================================================================")
+	fmt.Println("           decision-cli tune — 离线分层交叉验证与 Platt 概率校准报告")
+	fmt.Println("================================================================================")
+	fmt.Printf("数据来源文件 : %s\n", srcFile)
+	fmt.Printf("样本规模统计 : 总计 %d 条 (正例: %d, 负例: %d, 真实正例基率: %.2f%%)\n",
+		rep.TotalSamples, rep.PositiveSamples, rep.NegativeSamples, rep.BaseRate*100)
+	fmt.Printf("业务目标约束 : Precision >= %.1f%%, Recall >= %.1f%% (优化指标: F_%.1f)\n\n",
+		opts.MinPrecision*100, opts.MinRecall*100, opts.Beta)
+
+	fmt.Println("[各折交叉验证明细 (Validation Folds)]")
+	fmt.Printf("%-6s | %-32s | %-36s | %-16s | %-6s\n",
+		"Fold", "默认基准 (τ=0.50, T="+fmt.Sprintf("%.1f", opts.DefaultTemp)+")", "调优后 (最优阈值 τ* + Platt)", "Platt 参数 (A, B)", "达标?")
+	fmt.Println(strings.Repeat("-", 108))
+
+	for _, f := range rep.Folds {
+		defStr := fmt.Sprintf("P:%.1f%% R:%.1f%% F1:%.3f Brier:%.3f",
+			f.DefaultMetrics.Precision*100, f.DefaultMetrics.Recall*100, f.DefaultMetrics.F1, f.DefaultMetrics.Brier)
+		tunedStr := fmt.Sprintf("τ=%.2f P:%.1f%% R:%.1f%% F1:%.3f B:%.3f",
+			f.OptimalThresh, f.TunedMetrics.Precision*100, f.TunedMetrics.Recall*100, f.TunedMetrics.F1, f.TunedMetrics.Brier)
+		abStr := fmt.Sprintf("A=%.4f B=%.4f", f.PlattA, f.PlattB)
+		qualStr := "是"
+		if !f.MetRequirements {
+			qualStr = "否(已回退)"
+		}
+		fmt.Printf("Fold %-2d | %-32s | %-36s | %-16s | %-6s\n",
+			f.FoldIndex, defStr, tunedStr, abStr, qualStr)
+	}
+
+	fmt.Println(strings.Repeat("-", 108))
+	fmt.Println("\n[5-Fold CV 综合指标对比汇总 (Mean)]")
+	fmt.Printf("%-24s | %-22s | %-22s | %-16s\n", "评估维度 / 指标", "默认基线 (τ=0.50)", "调优后 (推荐配置)", "改善幅度")
+	fmt.Println(strings.Repeat("-", 90))
+
+	fmt.Printf("%-24s | %-22.1f%% | %-22.1f%% | %+.1f%%\n",
+		"准确率 (Accuracy)", rep.MeanDefault.Accuracy*100, rep.MeanTuned.Accuracy*100,
+		(rep.MeanTuned.Accuracy-rep.MeanDefault.Accuracy)*100)
+
+	pMeet := ""
+	if rep.MeanTuned.Precision >= opts.MinPrecision {
+		pMeet = " (已达标)"
+	}
+	fmt.Printf("%-24s | %-22.1f%% | %-22.1f%%%s | %+.1f%%\n",
+		"查准率 (Precision)", rep.MeanDefault.Precision*100, rep.MeanTuned.Precision*100, pMeet,
+		(rep.MeanTuned.Precision-rep.MeanDefault.Precision)*100)
+
+	rMeet := ""
+	if rep.MeanTuned.Recall >= opts.MinRecall {
+		rMeet = " (已达标)"
+	}
+	fmt.Printf("%-24s | %-22.1f%% | %-22.1f%%%s | %+.1f%%\n",
+		"查全率 (Recall)", rep.MeanDefault.Recall*100, rep.MeanTuned.Recall*100, rMeet,
+		(rep.MeanTuned.Recall-rep.MeanDefault.Recall)*100)
+
+	fmt.Printf("%-24s | %-22.4f | %-22.4f | %+.4f\n",
+		"F1 分数", rep.MeanDefault.F1, rep.MeanTuned.F1, rep.MeanTuned.F1-rep.MeanDefault.F1)
+
+	brierChange := ((rep.MeanTuned.Brier - rep.MeanDefault.Brier) / math.Max(rep.MeanDefault.Brier, 1e-6)) * 100
+	fmt.Printf("%-24s | %-22.4f | %-22.4f | %+.1f%% (越低越好)\n",
+		"Brier 分数 (概率校准误差)", rep.MeanDefault.Brier, rep.MeanTuned.Brier, brierChange)
+
+	eceChange := ((rep.MeanTuned.ECE - rep.MeanDefault.ECE) / math.Max(rep.MeanDefault.ECE, 1e-6)) * 100
+	fmt.Printf("%-24s | %-22.4f | %-22.4f | %+.1f%% (越低越好)\n",
+		"ECE 期望校准误差", rep.MeanDefault.ECE, rep.MeanTuned.ECE, eceChange)
+
+	fmt.Println(strings.Repeat("-", 90))
+
+	fmt.Println("\n🎯 生产环境部署建议参数 (Production Flags):")
+	fmt.Printf("   --threshold %.2f --calib-a %.4f --calib-b %.4f\n\n",
+		rep.RecommendedThresh, rep.RecommendedCalibA, rep.RecommendedCalibB)
+}
+
+func generateTuneHTMLReport(rep *tuner.TuneReport, srcFile string, opts tuner.TuneOptions) string {
+	var rows strings.Builder
+	for _, f := range rep.Folds {
+		qualBadge := `<span class="badge badge-success">达标</span>`
+		if !f.MetRequirements {
+			qualBadge = `<span class="badge badge-warning">未达标(回退)</span>`
+		}
+		rows.WriteString(fmt.Sprintf(`<tr>
+  <td>Fold %d</td>
+  <td>P: %.1f%% | R: %.1f%% | F1: %.3f (Brier: %.3f)</td>
+  <td><strong>τ=%.2f</strong> | P: %.1f%% | R: %.1f%% | F1: %.3f (Brier: %.3f)</td>
+  <td><code>A=%.4f, B=%.4f</code></td>
+  <td>%s</td>
+</tr>`, f.FoldIndex,
+			f.DefaultMetrics.Precision*100, f.DefaultMetrics.Recall*100, f.DefaultMetrics.F1, f.DefaultMetrics.Brier,
+			f.OptimalThresh, f.TunedMetrics.Precision*100, f.TunedMetrics.Recall*100, f.TunedMetrics.F1, f.TunedMetrics.Brier,
+			f.PlattA, f.PlattB, qualBadge))
+	}
+
+	brierPct := ((rep.MeanTuned.Brier - rep.MeanDefault.Brier) / math.Max(rep.MeanDefault.Brier, 1e-6)) * 100
+
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>decision-cli tune — 交叉验证与校准报告</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d1117; color: #c9d1d9; padding: 28px; line-height: 1.6; }
+    .container { max-width: 960px; margin: 0 auto; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    h1 { color: #fff; margin-top: 0; font-size: 22px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+    .stat-box { background: #21262d; border-radius: 6px; padding: 12px 16px; border: 1px solid #30363d; }
+    .stat-val { font-size: 24px; font-weight: bold; color: #58a6ff; }
+    .stat-sub { font-size: 12px; color: #8b949e; }
+    table { width: 100%%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+    th, td { border: 1px solid #30363d; padding: 10px 12px; text-align: left; }
+    th { background: #21262d; color: #fff; }
+    .badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; }
+    .badge-success { background: rgba(63,185,80,0.2); color: #3fb950; }
+    .badge-warning { background: rgba(210,153,34,0.2); color: #d29922; }
+    code { background: #21262d; padding: 2px 6px; border-radius: 4px; color: #ff7b72; font-family: monospace; }
+    .rec-box { background: rgba(88,166,255,0.1); border: 1px solid #58a6ff; border-radius: 6px; padding: 16px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>decision-cli tune — 离线分层五折交叉验证与概率校准报告</h1>
+      <p style="color:#8b949e; font-size:13px;">数据源: %s | 总样本: %d (正例基率: %.1f%%) | 约束: P&ge;%.0f%%, R&ge;%.0f%%</p>
+      
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-val">%.1f%%</div>
+          <div class="stat-sub">调优后查准率 (原 %.1f%%)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">%.1f%%</div>
+          <div class="stat-sub">调优后查全率 (原 %.1f%%)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">%.3f</div>
+          <div class="stat-sub">调优后 F1 (原 %.3f)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" style="color:#3fb950;">%+.1f%%</div>
+          <div class="stat-sub">Brier 误差变化 (越负越优)</div>
+        </div>
+      </div>
+
+      <h3>分折交叉验证明细</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Fold</th>
+            <th>默认基线 (τ=0.50)</th>
+            <th>调优后 (τ* + Platt)</th>
+            <th>拟合参数 (A, B)</th>
+            <th>达标情况</th>
+          </tr>
+        </thead>
+        <tbody>
+          %s
+        </tbody>
+      </table>
+
+      <div class="rec-box">
+        <h4 style="margin:0 0 8px 0; color:#58a6ff;">🎯 推荐生产部署参数</h4>
+        <code>--threshold %.2f --calib-a %.4f --calib-b %.4f</code>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`, srcFile, rep.TotalSamples, rep.BaseRate*100, opts.MinPrecision*100, opts.MinRecall*100,
+		rep.MeanTuned.Precision*100, rep.MeanDefault.Precision*100,
+		rep.MeanTuned.Recall*100, rep.MeanDefault.Recall*100,
+		rep.MeanTuned.F1, rep.MeanDefault.F1,
+		brierPct,
+		rows.String(),
+		rep.RecommendedThresh, rep.RecommendedCalibA, rep.RecommendedCalibB)
+}
+
 

@@ -1,0 +1,212 @@
+{
+  "gemma-4-26b-a4b": {
+    "mini_bench": {
+      "model": "gemma-4-26b-a4b",
+      "total": 5,
+      "correct": 5,
+      "accuracy": 1.0,
+      "items": [
+        {
+          "id": "doc-01-api-guide",
+          "expected": "是",
+          "predicted": "是",
+          "correct": true,
+          "confidence": 0.9774,
+          "category": "A-文档诉求(显式正例)"
+        },
+        {
+          "id": "doc-02-cookbook-request",
+          "expected": "是",
+          "predicted": "是",
+          "correct": true,
+          "confidence": 0.9651,
+          "category": "A-文档诉求(隐式教程正例)"
+        },
+        {
+          "id": "doc-03-pure-praise-noise",
+          "expected": "否",
+          "predicted": "否",
+          "correct": true,
+          "confidence": 0.9936,
+          "category": "A-文档诉求(纯夸奖负例)"
+        },
+        {
+          "id": "doc-04-weights-bug-trap",
+          "expected": "否",
+          "predicted": "否",
+          "correct": true,
+          "confidence": 0.6093,
+          "category": "A-文档诉求(近邻干扰：权重乱码报错而非文档缺失)"
+        },
+        {
+          "id": "quant-05-gguf-mlx",
+          "expected": "是",
+          "predicted": "是",
+          "correct": true,
+          "confidence": 0.9826,
+          "category": "B-量化与终端适配(正例)"
+        }
+      ]
+    },
+    "path_a": {
+      "model": "gemma-4-26b-a4b",
+      "choice_task": {
+        "total": 5,
+        "forward_acc": 1.0,
+        "reverse_acc": 1.0,
+        "order_consistency_rate": 1.0,
+        "cases": [
+          {
+            "id": "mc-01-api-guide",
+            "expected": "docs",
+            "forward_choice": "docs",
+            "forward_match": true,
+            "reverse_choice": "docs",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.9847,
+            "reverse_top_prob": 0.9789
+          },
+          {
+            "id": "mc-02-cookbook",
+            "expected": "docs",
+            "forward_choice": "docs",
+            "forward_match": true,
+            "reverse_choice": "docs",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.9732,
+            "reverse_top_prob": 0.9515
+          },
+          {
+            "id": "mc-03-praise",
+            "expected": "general_chat",
+            "forward_choice": "general_chat",
+            "forward_match": true,
+            "reverse_choice": "general_chat",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.9852,
+            "reverse_top_prob": 0.978
+          },
+          {
+            "id": "mc-04-garbled-output",
+            "expected": "bug_quality",
+            "forward_choice": "bug_quality",
+            "forward_match": true,
+            "reverse_choice": "bug_quality",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.9909,
+            "reverse_top_prob": 0.9892
+          },
+          {
+            "id": "mc-05-gguf-mlx",
+            "expected": "quant_local",
+            "forward_choice": "quant_local",
+            "forward_match": true,
+            "reverse_choice": "quant_local",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.9928,
+            "reverse_top_prob": 0.9878
+          }
+        ]
+      },
+      "score_task": {
+        "total": 5,
+        "exact_acc": 1.0,
+        "mae": 0.0,
+        "cases": [
+          {
+            "id": "sc-01-praise",
+            "expected_level": 0,
+            "predicted_level": 0,
+            "exact_match": true,
+            "absolute_error": 0,
+            "top_prob": 1,
+            "all_level_probs": {
+              "0": 1,
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            }
+          },
+          {
+            "id": "sc-02-chat",
+            "expected_level": 0,
+            "predicted_level": 0,
+            "exact_match": true,
+            "absolute_error": 0,
+            "top_prob": 1,
+            "all_level_probs": {
+              "0": 1,
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            }
+          },
+          {
+            "id": "sc-03-license",
+            "expected_level": 1,
+            "predicted_level": 1,
+            "exact_match": true,
+            "absolute_error": 0,
+            "top_prob": 1,
+            "all_level_probs": {
+              "0": 0,
+              "1": 1,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            }
+          },
+          {
+            "id": "sc-04-param-question",
+            "expected_level": 1,
+            "predicted_level": 1,
+            "exact_match": true,
+            "absolute_error": 0,
+            "top_prob": 1,
+            "all_level_probs": {
+              "0": 0,
+              "1": 1,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            }
+          },
+          {
+            "id": "sc-05-doc-request",
+            "expected_level": 2,
+            "predicted_level": 2,
+            "exact_match": true,
+            "absolute_error": 0,
+            "top_prob": 1,
+            "all_level_probs": {
+              "0": 0,
+              "1": 0,
+              "2": 1,
+              "3": 0,
+              "4": 0
+            }
+          }
+        ]
+      }
+    },
+    "jevbench_public": {
+      "model": "gemma-4-26b-a4b",
+      "total_items": 5,
+      "overall_accuracy": 1.0,
+      "elapsed_seconds": 0.06,
+      "tier_breakdown": {
+        "easy": {
+          "total": 5,
+          "accuracy": 1.0
+        }
+      }
+    }
+  }
+}

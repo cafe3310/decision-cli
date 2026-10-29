@@ -1,0 +1,110 @@
+{
+  "gemma-4-26b-a4b": {
+    "mini_bench": {
+      "model": "gemma-4-26b-a4b",
+      "total": 2,
+      "correct": 2,
+      "accuracy": 1.0,
+      "items": [
+        {
+          "id": "doc-01-api-guide",
+          "expected": "是",
+          "predicted": "是",
+          "correct": true,
+          "confidence": 0.9774,
+          "category": "A-文档诉求(显式正例)"
+        },
+        {
+          "id": "doc-02-cookbook-request",
+          "expected": "是",
+          "predicted": "是",
+          "correct": true,
+          "confidence": 0.9651,
+          "category": "A-文档诉求(隐式教程正例)"
+        }
+      ]
+    },
+    "path_a": {
+      "model": "gemma-4-26b-a4b",
+      "choice_task": {
+        "total": 2,
+        "forward_acc": 1.0,
+        "reverse_acc": 1.0,
+        "order_consistency_rate": 1.0,
+        "cases": [
+          {
+            "id": "mc-01-api-guide",
+            "expected": "docs",
+            "forward_choice": "docs",
+            "forward_match": true,
+            "reverse_choice": "docs",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.9847,
+            "reverse_top_prob": 0.9789
+          },
+          {
+            "id": "mc-02-cookbook",
+            "expected": "docs",
+            "forward_choice": "docs",
+            "forward_match": true,
+            "reverse_choice": "docs",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.9732,
+            "reverse_top_prob": 0.9515
+          }
+        ]
+      },
+      "score_task": {
+        "total": 2,
+        "exact_acc": 1.0,
+        "mae": 0.0,
+        "cases": [
+          {
+            "id": "sc-01-praise",
+            "expected_level": 0,
+            "predicted_level": 0,
+            "exact_match": true,
+            "absolute_error": 0,
+            "top_prob": 1,
+            "all_level_probs": {
+              "0": 1,
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            }
+          },
+          {
+            "id": "sc-02-chat",
+            "expected_level": 0,
+            "predicted_level": 0,
+            "exact_match": true,
+            "absolute_error": 0,
+            "top_prob": 1,
+            "all_level_probs": {
+              "0": 1,
+              "1": 0,
+              "2": 0,
+              "3": 0,
+              "4": 0
+            }
+          }
+        ]
+      }
+    },
+    "jevbench_public": {
+      "model": "gemma-4-26b-a4b",
+      "total_items": 2,
+      "overall_accuracy": 1.0,
+      "elapsed_seconds": 1.7,
+      "tier_breakdown": {
+        "easy": {
+          "total": 2,
+          "accuracy": 1.0
+        }
+      }
+    }
+  }
+}

@@ -15,6 +15,8 @@ type SingleDecisionResult struct {
 	Confidence  float64      `json:"confidence" yaml:"confidence"`   // max(p, 1-p)
 	Threshold   float64      `json:"threshold" yaml:"threshold"`     // active threshold (default 0.5)
 	Temperature float64      `json:"temperature" yaml:"temperature"` // active temperature (default 1.0)
+	CalibA      *float64     `json:"calib_a,omitempty" yaml:"calib_a,omitempty"` // Platt scaling slope A
+	CalibB      *float64     `json:"calib_b,omitempty" yaml:"calib_b,omitempty"` // Platt scaling intercept B
 	Logits      LogitDetails `json:"logits" yaml:"logits"`
 	Model       string       `json:"model" yaml:"model"`
 	ModelID     string       `json:"model_id" yaml:"model_id"`
@@ -125,6 +127,8 @@ type BatchDecisionReport struct {
 	DebiasedOrder bool              `json:"debiased_order,omitempty" yaml:"debiased_order,omitempty"`
 	Threshold     float64           `json:"threshold,omitempty" yaml:"threshold,omitempty"`
 	Temperature   float64           `json:"temperature" yaml:"temperature"`
+	CalibA        *float64          `json:"calib_a,omitempty" yaml:"calib_a,omitempty"`
+	CalibB        *float64          `json:"calib_b,omitempty" yaml:"calib_b,omitempty"`
 	Summary       BatchSummary      `json:"summary" yaml:"summary"`
 	Results       []BatchItemResult `json:"results" yaml:"results"`
 }
@@ -176,6 +180,8 @@ type ModelSpec struct {
 	PositiveTokens         []string `json:"positive_tokens" yaml:"positive_tokens"`
 	NegativeTokens         []string `json:"negative_tokens" yaml:"negative_tokens"`
 	CalibrationTemperature float64  `json:"calibration_temperature" yaml:"calibration_temperature"`
+	CalibA                 *float64 `json:"calib_a,omitempty" yaml:"calib_a,omitempty"`
+	CalibB                 *float64 `json:"calib_b,omitempty" yaml:"calib_b,omitempty"`
 	ChoiceTemperature      float64  `json:"choice_temperature,omitempty" yaml:"choice_temperature,omitempty"`
 	ScoreTemperature       float64  `json:"score_temperature,omitempty" yaml:"score_temperature,omitempty"`
 	DefaultThreshold       float64  `json:"default_threshold,omitempty" yaml:"default_threshold,omitempty"`
