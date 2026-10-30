@@ -176,7 +176,7 @@ func extractRecordSlice(generic any) ([]map[string]any, error) {
 		}
 		return out, nil
 	case map[string]any:
-		// Check common wrapper keys used in ling-feedback and standard datasets
+		// Check common wrapper keys in hierarchical dataset envelopes
 		for _, key := range []string{"insights", "records", "items", "results", "data"} {
 			if arr, ok := v[key]; ok {
 				if slice, isSlice := arr.([]any); isSlice {
@@ -215,7 +215,7 @@ func buildRecordContext(rec map[string]any, tmpl *template.Template) (string, er
 		return strings.TrimSpace(buf.String()), nil
 	}
 
-	// Automatic smart extraction for ling-feedback insights and generic records
+	// Default field extraction from text/content/context fields
 	for _, k := range []string{"context", "text", "content"} {
 		if val, ok := rec[k]; ok && val != nil {
 			s := strings.TrimSpace(fmt.Sprintf("%v", val))
@@ -225,7 +225,7 @@ func buildRecordContext(rec map[string]any, tmpl *template.Template) (string, er
 		}
 	}
 
-	// Check if record has ling-feedback fields (user_expression, suggested_action, raw_excerpt, title, summary)
+	// Compose context from standard structured feedback and annotation fields
 	var parts []string
 	for _, field := range []string{"dimension", "target_model", "service_scenario", "user_expression", "suggested_action", "title", "summary", "raw_excerpt", "raw_text"} {
 		if val, ok := rec[field]; ok && val != nil {

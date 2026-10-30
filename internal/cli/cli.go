@@ -13,6 +13,7 @@ import (
 	"github.com/cafe3310/decision-cli/internal/exporter"
 	"github.com/cafe3310/decision-cli/internal/infra"
 	"github.com/cafe3310/decision-cli/internal/server"
+	"github.com/cafe3310/decision-cli/internal/statusbar"
 	"github.com/cafe3310/decision-cli/internal/tuner"
 	"github.com/cafe3310/decision-cli/internal/types"
 	"github.com/spf13/cobra"
@@ -35,7 +36,7 @@ func NewRootCommand() *cobra.Command {
 基于 Apple MLX 推理框架，通过单步 Prefill 前向传播（max_tokens=1）提取原始 Logits 并计算校准概率，
 配合 SQLite 内容寻址缓存实现毫秒级判定响应，原生支持文本与多模态图像（单图/多图/空间候选框选择）。
 
-核心特性与子命令划分：
+特性与子命令划分：
   1. 单条文本与多模态判别（支持 --context 文本与 --image 图像）：
      - noun   : 二元判定（输出“是”/“否”及置信概率）
      - choose : 互斥多分类判定（支持图像分类、多图对比与空间候选框 Box 择优）
@@ -48,8 +49,9 @@ func NewRootCommand() *cobra.Command {
      - systemone : 评估 TypeSafe Jev /v1/systemone 复合多问请求（支持 assets 图像映射）
      - serve     : 启动常驻 SystemOne HTTP API 服务（监听指定 Host:Port）
      - kill      : 扫描并终止所有相关的 MLX 守护进程，释放统一内存
+     - uninstall : 终止后台进程并清理本机缓存、虚拟环境与配置文件
      - setup     : 初始化或修复自包含 MLX + Pillow 虚拟环境 (~/.cache/decision-cli/venv)
-     - doctor    : 检查硬件环境、MLX 运行时并运行金丝雀推理自检
+     - doctor    : 检查硬件环境、MLX 运行时并运行基准样例推理自检
      - models    : 列出支持的模型及其本地路径解析状态
      - cache     : 查看、导出或清理 SQLite 内容寻址缓存
 
@@ -111,6 +113,8 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.AddCommand(newModelsCommand(&flags))
 	rootCmd.AddCommand(newCacheCommand(&flags))
 	rootCmd.AddCommand(newTuneCommand(&flags))
+	rootCmd.AddCommand(newBarCommand(&flags))
+	rootCmd.AddCommand(newUninstallCommand(&flags))
 
 	return rootCmd
 }
@@ -185,7 +189,7 @@ func newNounCommand(rootFlags *RootFlags) *cobra.Command {
 支持通过 --image 传入单张或多张本地图像路径或 Base64，并可在文本中使用 {{image:1}} 引用。`,
 		Example: `  # 判定是否属于系统报错（默认使用主力多模态模型 gemma-4-26b-a4b）：
   decision-cli noun \
-    --rubrics "判断该反馈是否涉及核心支付功能的严重系统报错" \
+    --rubrics "判断该反馈是否涉及支付流程的严重系统报错" \
     --context "微信支付点击后一直转圈，最后提示错误码 5002，钱扣了但订单未生效"
 
   # 多模态图文判定（检查报错截图是否包含 HTTP 502 错误）：
@@ -298,9 +302,9 @@ func newChooseCommand(rootFlags *RootFlags) *cobra.Command {
 选项格式为英文逗号分隔的键值对，例如 "key1:描述一,key2:描述二"（注意：描述内部如需逗号或冒号，请使用全角“，”“：”）。
 支持使用 --debias-order 运行正反序双向前向推理以消除大模型位置偏置。
 支持通过 --image 传入单张或多张图片，实现图像分类、双图 A/B 对比或空间候选框 Box 定位（Gemma 4 原生坐标系为 0..1000 归一化的 [ymin，xmin，ymax，xmax]）。`,
-		Example: `  # 1. 用户反馈核心诉求多分类判定：
+		Example: `  # 1. 用户反馈诉求多分类判定：
   decision-cli choose \
-    --rubrics "判断用户反馈的核心诉求类型" \
+    --rubrics "判断用户反馈的诉求类型" \
     --choices "bug:系统故障报错,feature:新功能建议,sales:商务咨询与报价,noise:闲聊无明确诉求" \
     --context "请问系统支持离线私有化部署到医疗内网吗？大概费用怎么核算？" \
     --debias-order
@@ -803,7 +807,7 @@ func newBatchScoreCommand(rootFlags *RootFlags) *cobra.Command {
 		Example: `  # 批量对故障报告进行严重度量规评级：
   decision-cli batch score \
     --rubrics "工单处理紧急度评级" \
-    --levels "P3常规低优,P2重要跟进,P1高优阻断,P0核心崩溃即刻响应" \
+    --levels "P3常规低优,P2重要跟进,P1高优阻断,P0系统崩溃即刻响应" \
     --input bug-reports.yaml \
     --output bug-scores.yaml \
     --format yaml \
@@ -1020,12 +1024,12 @@ func newDoctorCommand(rootFlags *RootFlags) *cobra.Command {
 	var targetModel string
 	cmd := &cobra.Command{
 		Use:   "doctor",
-		Short: "自检 Apple Silicon 硬件、配置、MLX 运行时并执行金丝雀单步推理测试",
+		Short: "自检 Apple Silicon 硬件、配置、MLX 运行时并执行基准样例单步推理测试",
 		Long: `doctor 子命令依次自检：
   1. 系统硬件与生效的 config.yaml 配置；
   2. Python 虚拟环境与 MLX/mlx-lm 框架依赖；
   3. 各受支持模型的本地物理路径解析；
-  4. 对模型执行正向例、负向例与反转例的金丝雀单步推理验证。`,
+  4. 对模型执行正向例、负向例与反转例的基准样例单步推理验证。`,
 		Example: `  # 全量自检：
   decision-cli doctor
 
@@ -1039,7 +1043,7 @@ func newDoctorCommand(rootFlags *RootFlags) *cobra.Command {
 			return infra.RunDoctor(cfg, cfgPath, created, targetModel)
 		},
 	}
-	cmd.Flags().StringVar(&targetModel, "model", "", "仅针对特定模型执行金丝雀推理测试")
+	cmd.Flags().StringVar(&targetModel, "model", "", "仅针对特定模型执行基准样例推理测试")
 	return cmd
 }
 
@@ -1059,7 +1063,17 @@ func newModelsCommand(rootFlags *RootFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			aliases := []string{"gemma-4-26b-a4b", "gemma-4-e4b", "qwen3-reranker-4b"}
+			aliases := []string{"gemma-4-26b-a4b", "gemma-4-e4b", "qwen3-reranker-4b", "ling-3.0-tiny"}
+			seenAliases := make(map[string]bool)
+			for _, a := range aliases {
+				seenAliases[a] = true
+			}
+			for k := range cfg.Models.Registry {
+				if !seenAliases[k] {
+					aliases = append(aliases, k)
+					seenAliases[k] = true
+				}
+			}
 			var list []infra.ResolvedModel
 			for _, a := range aliases {
 				rm, _ := infra.ResolveModel(cfg, a)
@@ -1403,6 +1417,7 @@ func newKillCommand(rootFlags *RootFlags) *cobra.Command {
 			for _, log := range logs {
 				fmt.Printf("  - %s\n", log)
 			}
+			_ = os.Remove(config.ExpandPath("~/.cache/decision-cli/worker_status.json"))
 
 			fmt.Println("\n✅ 所有相关 MLX 进程已清理完毕，已释放统一内存。")
 			return nil
@@ -1414,6 +1429,90 @@ func newKillCommand(rootFlags *RootFlags) *cobra.Command {
 
 	return cmd
 }
+
+func newUninstallCommand(rootFlags *RootFlags) *cobra.Command {
+	var (
+		yes         bool
+		purgeConfig bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "uninstall",
+		Short: "停止后台进程并清理本机缓存、虚拟环境与配置文件",
+		Long: `uninstall 子命令用于移除 decision-cli 在本机创建的运行时数据。
+默认终止常驻 MLX Worker 与状态栏进程，并删除缓存与虚拟环境目录 (~/.cache/decision-cli)。
+可通过 --all 同时移除用户全局配置 (~/.config/decision-cli)。`,
+		Example: `  # 交互式确认后执行清理：
+  decision-cli uninstall
+
+  # 自动确认并清除缓存与配置：
+  decision-cli uninstall --yes --all`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !yes {
+				fmt.Print("此操作将终止后台推理进程并删除 ~/.cache/decision-cli 下的所有缓存数据与虚拟环境。\n确认继续？ [y/N]: ")
+				var ans string
+				_, _ = fmt.Scanln(&ans)
+				ans = strings.ToLower(strings.TrimSpace(ans))
+				if ans != "y" && ans != "yes" {
+					fmt.Println("操作已取消。")
+					return nil
+				}
+			}
+
+			cfg, _, _, err := config.LoadOrInit(rootFlags.ConfigPath)
+			if err != nil {
+				cfg = &types.AppConfig{}
+			}
+
+			logs, err := infra.Uninstall(cfg, purgeConfig)
+			for _, l := range logs {
+				fmt.Printf("- %s\n", l)
+			}
+			if err != nil {
+				return err
+			}
+
+			exePath, _ := os.Executable()
+			fmt.Println("\n运行时环境与缓存数据已清理完毕。")
+			if exePath != "" {
+				fmt.Printf("若需完全移除二进制执行文件，可手动执行：\n  rm -f %s\n", exePath)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVar(&yes, "yes", false, "跳过交互式确认")
+	cmd.Flags().BoolVar(&purgeConfig, "all", false, "同时清理全局配置文件目录 (~/.config/decision-cli)")
+
+	return cmd
+}
+
+// =========================================================================
+// macOS 菜单栏状态图标命令 (`decision-cli bar`)
+// =========================================================================
+
+func newBarCommand(rootFlags *RootFlags) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "bar",
+		Short: "在 macOS 菜单栏常驻显示 decision-cli 与 MLX Worker 运行状态图标",
+		Long: `启动 macOS 原生状态栏图标（Menu Bar Status Item），实时监控：
+  1. 当前驻留的 Decision 决策模型（如 gemma-4-26b-a4b、ling-3.0-tiny 等）
+  2. 当前任务排队深度（Queue Length）
+  3. 即时吞吐速度（Throughput decisions/sec）与单步前向耗时
+  4. 统一内存显存占用
+点击状态栏图标可展开富文本交互菜单，支持一键打开缓存目录、查看运行日志或平稳释放显存。`,
+		Example: `  # 在 macOS 状态栏常驻启动图标（按 Ctrl+C 或通过菜单退出）：
+  decision-cli bar
+
+  # 后台静默启动状态栏（推荐日常使用）：
+  nohup decision-cli bar >/dev/null 2>&1 &`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return statusbar.Run()
+		},
+	}
+	return cmd
+}
+
 
 // =========================================================================
 // 离线交叉验证阈值与校准调优命令 (`decision-cli tune`)
@@ -1502,7 +1601,7 @@ func newTuneCommand(rootFlags *RootFlags) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&inputPath, "input", "i", "", "包含 logits 与标签的评测数据文件路径 (.json, .jsonl, .yaml)")
+	cmd.Flags().StringVar(&inputPath, "input", "", "包含 logits 与标签的评测数据文件路径 (.json, .jsonl, .yaml)")
 	cmd.Flags().StringVar(&labelField, "label-field", "", "指定真值标签字段名（缺省自动匹配 label/target/expected/ground_truth）")
 	cmd.Flags().Float64Var(&minPrecision, "min-precision", 0.80, "业务最低查准率门槛 (Precision >= X)")
 	cmd.Flags().Float64Var(&minRecall, "min-recall", 0.80, "业务最低查全率门槛 (Recall >= X)")

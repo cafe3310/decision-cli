@@ -175,7 +175,7 @@ type SystemOneResponse struct {
 type ModelSpec struct {
 	Alias                  string   `json:"alias" yaml:"alias"`
 	HFRepoID               string   `json:"hf_repo_id" yaml:"hf_repo_id"`
-	PromptStyle            string   `json:"prompt_style" yaml:"prompt_style"` // "qwen3-reranker" | "gemma4-binary"
+	PromptStyle            string   `json:"prompt_style" yaml:"prompt_style"` // "qwen3-reranker" | "gemma4-binary" | "ling-binary"
 	SupportsVision         bool     `json:"supports_vision,omitempty" yaml:"supports_vision,omitempty"`
 	PositiveTokens         []string `json:"positive_tokens" yaml:"positive_tokens"`
 	NegativeTokens         []string `json:"negative_tokens" yaml:"negative_tokens"`
@@ -241,4 +241,18 @@ type CacheEntry struct {
 	CreatedAt     string  `json:"created_at" yaml:"created_at"`
 	HitCount      int     `json:"hit_count" yaml:"hit_count"`
 	LastAccessed  string  `json:"last_accessed" yaml:"last_accessed"`
+}
+
+// WorkerStatus represents the live runtime status snapshot published by mlx_worker.py.
+type WorkerStatus struct {
+	PID               int     `json:"pid" yaml:"pid"`
+	State             string  `json:"state" yaml:"state"` // "idle", "inferring", "switching"
+	CurrentModelAlias string  `json:"current_model_alias" yaml:"current_model_alias"`
+	CurrentModelPath  string  `json:"current_model_path" yaml:"current_model_path"`
+	QueueLength       int     `json:"queue_length" yaml:"queue_length"`
+	ThroughputDPS     float64 `json:"throughput_dps" yaml:"throughput_dps"`
+	AvgLatencyMs      float64 `json:"avg_latency_ms" yaml:"avg_latency_ms"`
+	RSSMB             int     `json:"rss_mb" yaml:"rss_mb"`
+	TotalDecisions    int64   `json:"total_decisions" yaml:"total_decisions"`
+	UpdatedAt         int64   `json:"updated_at" yaml:"updated_at"`
 }

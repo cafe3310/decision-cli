@@ -10,11 +10,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/cafe3310/decision-cli/internal/config"
+	"github.com/cafe3310/decision-cli/internal/statusbar"
 	"github.com/cafe3310/decision-cli/internal/types"
 )
 
@@ -41,11 +44,66 @@ type ResolvedModel struct {
 	CachedOnDisk bool           `json:"cached_on_disk" yaml:"cached_on_disk"`
 }
 
+type probeCacheRecord struct {
+	BinPath  string `json:"bin_path"`
+	ModTime  int64  `json:"mod_time"`
+	Size     int64  `json:"size"`
+	MLX      string `json:"mlx"`
+	MLXLM    string `json:"mlx_lm"`
+	Device   string `json:"device"`
+}
+
+func getProbeCachePath() string {
+	return config.ExpandPath("~/.cache/decision-cli/probe_cache.json")
+}
+
+func loadProbeCache(binPath string) (probeCacheRecord, bool) {
+	cacheFile := getProbeCachePath()
+	raw, err := os.ReadFile(cacheFile)
+	if err != nil {
+		return probeCacheRecord{}, false
+	}
+	var m map[string]probeCacheRecord
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return probeCacheRecord{}, false
+	}
+	rec, ok := m[binPath]
+	if !ok {
+		return probeCacheRecord{}, false
+	}
+	fi, err := os.Stat(binPath)
+	if err != nil || fi.ModTime().Unix() != rec.ModTime || fi.Size() != rec.Size {
+		return probeCacheRecord{}, false
+	}
+	return rec, true
+}
+
+func saveProbeCache(rec probeCacheRecord) {
+	cacheFile := getProbeCachePath()
+	_ = os.MkdirAll(filepath.Dir(cacheFile), 0755)
+	var m map[string]probeCacheRecord
+	if raw, err := os.ReadFile(cacheFile); err == nil {
+		_ = json.Unmarshal(raw, &m)
+	}
+	if m == nil {
+		m = make(map[string]probeCacheRecord)
+	}
+	m[rec.BinPath] = rec
+	if b, err := json.MarshalIndent(m, "", "  "); err == nil {
+		_ = os.WriteFile(cacheFile, b, 0644)
+	}
+}
+
 // ProbeMLXCommand checks whether cmdPrefix (e.g. ["/path/to/python3"]) has mlx, mlx_lm, and PIL installed.
 func ProbeMLXCommand(cmdPrefix []string) (mlxVer, mlxLMVer, device string, ok bool) {
 	if len(cmdPrefix) == 0 {
 		return "", "", "", false
 	}
+	binPath := cmdPrefix[0]
+	if rec, cached := loadProbeCache(binPath); cached {
+		return rec.MLX, rec.MLXLM, rec.Device, true
+	}
+
 	probeScript := `import json, mlx.core as mx, mlx_lm, PIL
 print(json.dumps({
   "mlx": getattr(mx, "__version__", "unknown"),
@@ -53,7 +111,7 @@ print(json.dumps({
   "device": str(mx.default_device())
 }))`
 	args := append(append([]string{}, cmdPrefix[1:]...), "-c", probeScript)
-	cmd := exec.Command(cmdPrefix[0], args...)
+	cmd := exec.Command(binPath, args...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -67,11 +125,41 @@ print(json.dumps({
 	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &parsed); err != nil {
 		return "", "", "", false
 	}
+	if fi, sErr := os.Stat(binPath); sErr == nil {
+		saveProbeCache(probeCacheRecord{
+			BinPath: binPath,
+			ModTime: fi.ModTime().Unix(),
+			Size:    fi.Size(),
+			MLX:     parsed.MLX,
+			MLXLM:   parsed.MLXLM,
+			Device:  parsed.Device,
+		})
+	}
 	return parsed.MLX, parsed.MLXLM, parsed.Device, true
 }
 
+func findUsableSystemPython() string {
+	candidates := []string{
+		"/opt/homebrew/bin/python3",
+	}
+	if p, err := exec.LookPath("python3"); err == nil {
+		candidates = append(candidates, p)
+	}
+	for _, cand := range candidates {
+		if _, err := os.Stat(cand); err != nil {
+			continue
+		}
+		cmd := exec.Command(cand, "-c", "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)")
+		if err := cmd.Run(); err == nil {
+			return cand
+		}
+	}
+	return ""
+}
+
 // EnsureManagedVenv creates or repairs the self-contained Python virtual environment
-// at cfg.Runtime.VenvDir (default ~/.cache/decision-cli/venv) using uv.
+// at cfg.Runtime.VenvDir (default ~/.cache/decision-cli/venv).
+// It prefers uv when available, and falls back to system python3 -m venv.
 func EnsureManagedVenv(cfg *types.AppConfig) (string, error) {
 	venvDir := cfg.Runtime.VenvDir
 	if strings.TrimSpace(venvDir) == "" {
@@ -94,7 +182,6 @@ func EnsureManagedVenv(cfg *types.AppConfig) (string, error) {
 	if _, err := exec.LookPath(uvBin); err == nil {
 		foundUV = true
 	} else {
-		// Check common uv locations on macOS
 		for _, cand := range []string{"/opt/homebrew/bin/uv", filepath.Join(config.ExpandPath("~"), ".local/bin/uv"), filepath.Join(config.ExpandPath("~"), ".cargo/bin/uv")} {
 			if _, sErr := os.Stat(cand); sErr == nil {
 				uvBin = cand
@@ -103,24 +190,45 @@ func EnsureManagedVenv(cfg *types.AppConfig) (string, error) {
 			}
 		}
 	}
-	if !foundUV {
-		return "", fmt.Errorf("未检测到 uv 工具（decision-cli 运行时强依赖 uv 管理自包含 Python 虚拟环境）。\n建议安装 uv 后重试：\n  brew install uv  # 或运行: curl -LsSf https://astral.sh/uv/install.sh | sh\n安装完成后运行: decision-cli setup")
-	}
 
 	if err := os.MkdirAll(filepath.Dir(expandedVenv), 0755); err != nil {
 		return "", fmt.Errorf("failed to create parent directory for venv %s: %w", expandedVenv, err)
 	}
 
+	packages := []string{"mlx>=0.32.0", "mlx-lm>=0.32.0", "pillow", "huggingface_hub[cli]"}
+
+	if foundUV {
+		if _, err := os.Stat(venvPy); os.IsNotExist(err) {
+			venvCmd := exec.Command(uvBin, "venv", expandedVenv)
+			if out, err := venvCmd.CombinedOutput(); err != nil {
+				return "", fmt.Errorf("failed to create self-contained venv at %s via %s: %v (%s)", expandedVenv, uvBin, err, strings.TrimSpace(string(out)))
+			}
+		}
+		pipArgs := append([]string{"pip", "install", "--python", venvPy}, packages...)
+		pipCmd := exec.Command(uvBin, pipArgs...)
+		if out, err := pipCmd.CombinedOutput(); err != nil {
+			return "", fmt.Errorf("failed to install runtime packages into %s: %v (%s)", expandedVenv, err, strings.TrimSpace(string(out)))
+		}
+		return venvPy, nil
+	}
+
+	// Fallback to system python3 -m venv
+	sysPy := findUsableSystemPython()
+	if sysPy == "" {
+		return "", fmt.Errorf("未检测到 uv 或 Python 3.10+ 环境。\n建议安装方案：\n  brew install uv  # 或运行: curl -LsSf https://astral.sh/uv/install.sh | sh\n安装完成后重新执行: decision-cli setup")
+	}
+
 	if _, err := os.Stat(venvPy); os.IsNotExist(err) {
-		venvCmd := exec.Command(uvBin, "venv", expandedVenv)
+		venvCmd := exec.Command(sysPy, "-m", "venv", expandedVenv)
 		if out, err := venvCmd.CombinedOutput(); err != nil {
-			return "", fmt.Errorf("failed to create self-contained venv at %s via %s: %v (%s)", expandedVenv, uvBin, err, strings.TrimSpace(string(out)))
+			return "", fmt.Errorf("failed to create venv at %s via %s: %v (%s)", expandedVenv, sysPy, err, strings.TrimSpace(string(out)))
 		}
 	}
 
-	pipCmd := exec.Command(uvBin, "pip", "install", "--python", venvPy, "mlx>=0.32.0", "mlx-lm>=0.32.0", "pillow")
+	pipArgs := append([]string{"-m", "pip", "install"}, packages...)
+	pipCmd := exec.Command(venvPy, pipArgs...)
 	if out, err := pipCmd.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("failed to install mlx, mlx-lm, pillow into %s: %v (%s)", expandedVenv, err, strings.TrimSpace(string(out)))
+		return "", fmt.Errorf("failed to install runtime packages via pip into %s: %v (%s)", expandedVenv, err, strings.TrimSpace(string(out)))
 	}
 
 	return venvPy, nil
@@ -391,7 +499,7 @@ func ResolveModel(cfg *types.AppConfig, modelName string) (ResolvedModel, error)
 		spec.Alias, spec.HFRepoID, cfg.Models.Paths, cfg.Models.ScanDirs, spec.Alias, spec.HFRepoID, spec.Alias)
 }
 
-// DownloadModel 利用 huggingface-cli 下载指定模型权重到本地扫描目录，并返回解析后的本地物理路径
+// DownloadModel 利用 huggingface-cli 或自包含 Python 环境下载指定模型权重到本地扫描目录，并返回解析后的本地物理路径
 func DownloadModel(cfg *types.AppConfig, modelArg string) (string, string, error) {
 	var repoID, alias string
 	if spec, ok := cfg.Models.Registry[modelArg]; ok {
@@ -416,35 +524,54 @@ func DownloadModel(cfg *types.AppConfig, modelArg string) (string, string, error
 		return alias, rm.LocalPath, nil
 	}
 
-	// 查找 huggingface-cli
-	hfCli := "huggingface-cli"
-	found := false
-	if _, err := exec.LookPath(hfCli); err == nil {
-		found = true
-	} else {
-		for _, cand := range []string{
-			"/opt/homebrew/bin/huggingface-cli",
-			filepath.Join(config.ExpandPath("~"), ".local/bin/huggingface-cli"),
-			filepath.Join(config.ExpandPath("~/.cache/decision-cli/venv/bin"), "huggingface-cli"),
-		} {
-			if _, err := os.Stat(cand); err == nil {
-				hfCli = cand
-				found = true
-				break
-			}
+	venvDir := cfg.Runtime.VenvDir
+	if strings.TrimSpace(venvDir) == "" {
+		venvDir = "~/.cache/decision-cli/venv"
+	}
+	venvPy := filepath.Join(config.ExpandPath(venvDir), "bin", "python3")
+	venvHFCli := filepath.Join(config.ExpandPath(venvDir), "bin", "huggingface-cli")
+
+	// 查找 huggingface-cli 候选
+	hfCliCandidates := []string{
+		venvHFCli,
+		"/opt/homebrew/bin/huggingface-cli",
+		filepath.Join(config.ExpandPath("~"), ".local/bin/huggingface-cli"),
+	}
+	if pathCli, err := exec.LookPath("huggingface-cli"); err == nil {
+		hfCliCandidates = append([]string{pathCli}, hfCliCandidates...)
+	}
+
+	var downloadCmd *exec.Cmd
+	var toolName string
+
+	for _, cand := range hfCliCandidates {
+		if _, err := os.Stat(cand); err == nil {
+			toolName = cand
+			downloadCmd = exec.Command(cand, "download", repoID)
+			break
 		}
 	}
 
-	if !found {
-		return alias, "", fmt.Errorf("未检测到 huggingface-cli 工具。\n建议安装方案：\n  brew install huggingface-cli  # 或运行: uv tool install huggingface_hub[cli]\n安装完成后重新执行: decision-cli models download %s", alias)
+	// 若未找到独立二进制，尝试调用自包含环境的 Python 模块
+	if downloadCmd == nil {
+		if _, err := os.Stat(venvPy); err == nil {
+			toolName = venvPy + " (huggingface_hub)"
+			downloadScript := `import sys
+from huggingface_hub import snapshot_download
+snapshot_download(repo_id=sys.argv[1])`
+			downloadCmd = exec.Command(venvPy, "-c", downloadScript, repoID)
+		}
 	}
 
-	fmt.Fprintf(os.Stderr, "📥 正在通过 %s 下载模型权重: %s (别名: %s)...\n", hfCli, repoID, alias)
-	cmd := exec.Command(hfCli, "download", repoID)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	if err := cmd.Run(); err != nil {
+	if downloadCmd == nil {
+		return alias, "", fmt.Errorf("未检测到 huggingface-cli 或 Python 下载环境。\n建议执行 `decision-cli setup` 初始化环境，或运行 `brew install huggingface-cli`。")
+	}
+
+	fmt.Fprintf(os.Stderr, "正在通过 %s 下载模型权重: %s (别名: %s)...\n", toolName, repoID, alias)
+	downloadCmd.Stdout = os.Stdout
+	downloadCmd.Stderr = os.Stderr
+	downloadCmd.Stdin = os.Stdin
+	if err := downloadCmd.Run(); err != nil {
 		return alias, "", fmt.Errorf("模型权重下载失败: %w", err)
 	}
 
@@ -455,6 +582,50 @@ func DownloadModel(cfg *types.AppConfig, modelArg string) (string, string, error
 	}
 
 	return alias, rm.LocalPath, nil
+}
+
+// Uninstall terminates background worker processes and removes cache/config directories.
+func Uninstall(cfg *types.AppConfig, purgeConfig bool) ([]string, error) {
+	var logs []string
+
+	// 1. Terminate running MLX processes
+	procs, err := FindRelatedMLXProcesses(cfg)
+	if err == nil && len(procs) > 0 {
+		killLogs, kErr := KillRelatedMLXProcesses(cfg, procs, true)
+		if kErr != nil {
+			logs = append(logs, fmt.Sprintf("终止后台进程遇到异常: %v", kErr))
+		} else {
+			logs = append(logs, killLogs...)
+		}
+	}
+
+	// 2. Remove cache directory (~/.cache/decision-cli)
+	cacheDir := config.ExpandPath("~/.cache/decision-cli")
+	if _, sErr := os.Stat(cacheDir); sErr == nil {
+		if rErr := os.RemoveAll(cacheDir); rErr != nil {
+			logs = append(logs, fmt.Sprintf("清理缓存目录失败 (%s): %v", cacheDir, rErr))
+		} else {
+			logs = append(logs, fmt.Sprintf("已移除缓存与虚拟环境目录: %s", cacheDir))
+		}
+	} else {
+		logs = append(logs, fmt.Sprintf("缓存目录已不存在: %s", cacheDir))
+	}
+
+	// 3. Purge config directory (~/.config/decision-cli) if requested
+	if purgeConfig {
+		cfgDir := config.ExpandPath("~/.config/decision-cli")
+		if _, sErr := os.Stat(cfgDir); sErr == nil {
+			if rErr := os.RemoveAll(cfgDir); rErr != nil {
+				logs = append(logs, fmt.Sprintf("清理配置目录失败 (%s): %v", cfgDir, rErr))
+			} else {
+				logs = append(logs, fmt.Sprintf("已移除配置目录: %s", cfgDir))
+			}
+		} else {
+			logs = append(logs, fmt.Sprintf("配置目录已不存在: %s", cfgDir))
+		}
+	}
+
+	return logs, nil
 }
 
 func findLatestSnapshot(hfRepoRoot string) string {
@@ -576,11 +747,9 @@ func ParseIdleSeconds(s string) float64 {
 }
 
 // EnsureDaemonRunning starts the Unix Domain Socket MLX worker daemon if it isn't already listening,
-// and returns an active socket connection Function.
-func EnsureDaemonRunning(cfg *types.AppConfig, rt ResolvedRuntime) (string, error) {
-	if !rt.Valid {
-		return "", fmt.Errorf("invalid MLX runtime: %s", rt.Error)
-	}
+// and returns an active socket connection. If rt is nil or invalid, it lazily resolves runtime only if the daemon needs to be started.
+// Uses an advisory file lock (worker.lock) to guarantee singleton daemon startup across concurrent processes.
+func EnsureDaemonRunning(cfg *types.AppConfig, rt *ResolvedRuntime) (string, error) {
 	sockPath := config.ExpandPath(cfg.Runtime.WorkerSocket)
 	if sockPath == "" {
 		sockPath = config.ExpandPath("~/.cache/decision-cli/worker.sock")
@@ -591,14 +760,40 @@ func EnsureDaemonRunning(cfg *types.AppConfig, rt ResolvedRuntime) (string, erro
 		return "", fmt.Errorf("failed to write mlx_worker.py: %w", err)
 	}
 
-	// Check if daemon is already alive
+	// 1. Fast Path: Check if daemon is already alive & responsive (ZERO Python invocation!)
 	if pingDaemon(sockPath) {
 		if !scriptChanged {
+			EnsureStatusBarRunning()
 			return sockPath, nil
 		}
 		// Restart daemon so updated mlx_worker.py takes effect
 		shutdownDaemon(sockPath)
 		time.Sleep(100 * time.Millisecond)
+	}
+
+	// 2. Obtain flock on worker.lock to ensure strictly ONE startup happens system-wide
+	lockPath := filepath.Join(filepath.Dir(sockPath), "worker.lock")
+	_ = os.MkdirAll(filepath.Dir(lockPath), 0755)
+	lockFile, lockErr := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
+	if lockErr == nil {
+		defer lockFile.Close()
+		_ = syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX)
+		defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+
+		// Double-check: another process might have finished starting it while we waited for the lock
+		if pingDaemon(sockPath) && !scriptChanged {
+			EnsureStatusBarRunning()
+			return sockPath, nil
+		}
+	}
+
+	// 3. Daemon not running or needs restart; resolve runtime if not provided
+	if rt == nil || !rt.Valid {
+		resolved := ResolveRuntime(cfg)
+		rt = &resolved
+		if !rt.Valid {
+			return "", fmt.Errorf("invalid MLX runtime: %s", rt.Error)
+		}
 	}
 
 	if err := os.MkdirAll(filepath.Dir(sockPath), 0755); err != nil {
@@ -630,6 +825,7 @@ func EnsureDaemonRunning(cfg *types.AppConfig, rt ResolvedRuntime) (string, erro
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
 		if pingDaemon(sockPath) {
+			EnsureStatusBarRunning()
 			return sockPath, nil
 		}
 		select {
@@ -639,6 +835,33 @@ func EnsureDaemonRunning(cfg *types.AppConfig, rt ResolvedRuntime) (string, erro
 		}
 	}
 	return "", fmt.Errorf("mlx_worker daemon did not respond on socket %s within timeout", sockPath)
+}
+
+// EnsureStatusBarRunning launches "decision-cli bar" in background on macOS if not already running.
+func EnsureStatusBarRunning() {
+	if os.Getenv("DECISION_CLI_NO_BAR") == "1" || runtime.GOOS != "darwin" {
+		return
+	}
+	if statusbar.IsBarRunning() {
+		return
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	devNull, _ := os.OpenFile(os.DevNull, os.O_RDWR, 0)
+	cmd := exec.Command(exe, "bar")
+	if devNull != nil {
+		cmd.Stdin = devNull
+		cmd.Stdout = devNull
+		cmd.Stderr = devNull
+	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	_ = cmd.Start()
+	if devNull != nil {
+		_ = devNull.Close()
+	}
 }
 
 func shutdownDaemon(sockPath string) {
@@ -676,20 +899,18 @@ func pingDaemon(sockPath string) bool {
 	return resp.OK
 }
 
-// ScoreBatchViaMLX evaluates a batch of binary noul items using the resident Unix Domain Socket worker
-// (or falls back to one-shot subprocess if socket bind is restricted).
-func ScoreBatchViaMLX(cfg *types.AppConfig, rt ResolvedRuntime, model ResolvedModel, rubrics string, items []WorkerScoreItem) (*ScoreResponse, error) {
+// ScoreBatchViaMLX evaluates a batch of binary noul items using the resident Unix Domain Socket worker.
+func ScoreBatchViaMLX(cfg *types.AppConfig, rt *ResolvedRuntime, model ResolvedModel, rubrics string, items []WorkerScoreItem) (*ScoreResponse, error) {
 	return ScoreMultiStreamingViaMLX(cfg, rt, model, WorkerMultiParams{
 		Primitive: "noul",
 		Rubrics:   rubrics,
 	}, items, nil, nil)
 }
 
-// ScoreBatchStreamingViaMLX evaluates a batch of binary noul items in a single worker invocation, calling onItem
-// immediately as each item is scored so callers can persist to SQLite and emit live progress.
+// ScoreBatchStreamingViaMLX evaluates a batch of binary noul items in a single worker invocation.
 func ScoreBatchStreamingViaMLX(
 	cfg *types.AppConfig,
-	rt ResolvedRuntime,
+	rt *ResolvedRuntime,
 	model ResolvedModel,
 	rubrics string,
 	items []WorkerScoreItem,
@@ -705,7 +926,7 @@ func ScoreBatchStreamingViaMLX(
 // ScoreMultiViaMLX evaluates a batch of items for any primitive ("noul", "choice", "score").
 func ScoreMultiViaMLX(
 	cfg *types.AppConfig,
-	rt ResolvedRuntime,
+	rt *ResolvedRuntime,
 	model ResolvedModel,
 	params WorkerMultiParams,
 	items []WorkerScoreItem,
@@ -717,7 +938,7 @@ func ScoreMultiViaMLX(
 // in a single worker invocation, calling onItem immediately as each item is scored.
 func ScoreMultiStreamingViaMLX(
 	cfg *types.AppConfig,
-	rt ResolvedRuntime,
+	rt *ResolvedRuntime,
 	model ResolvedModel,
 	params WorkerMultiParams,
 	items []WorkerScoreItem,
@@ -756,46 +977,38 @@ func ScoreMultiStreamingViaMLX(
 		return m
 	}
 
-	// If no streaming callback needed, try Unix socket first
+	sockPath, err := EnsureDaemonRunning(cfg, rt)
+	if err != nil {
+		return nil, err
+	}
 	if onItem == nil {
-		reqPayload := buildReq(false)
-		if reqBytes, err := json.Marshal(reqPayload); err == nil {
-			if sockPath, err := EnsureDaemonRunning(cfg, rt); err == nil {
-				if resp, sErr := sendSocketRequest(sockPath, reqBytes); sErr == nil {
-					return resp, nil
-				}
-			}
+		reqBytes, err := json.Marshal(buildReq(false))
+		if err != nil {
+			return nil, err
 		}
+		return sendSocketRequest(sockPath, reqBytes)
 	}
-
-	reqPayload := buildReq(true)
-	reqBytes, err := json.Marshal(reqPayload)
+	reqBytes, err := json.Marshal(buildReq(true))
 	if err != nil {
 		return nil, err
 	}
+	return sendSocketStreamRequest(sockPath, reqBytes, onStatus, onItem)
+}
 
-	scriptPath, err := EnsureWorkerScript()
+func sendSocketStreamRequest(sockPath string, reqBytes []byte, onStatus func(string), onItem func(WorkerScoreResult)) (*ScoreResponse, error) {
+	conn, err := net.DialTimeout("unix", sockPath, 2*time.Second)
 	if err != nil {
 		return nil, err
 	}
-	args := append(append([]string{}, rt.Command[1:]...), scriptPath, "--oneshot")
-	cmd := exec.Command(rt.Command[0], args...)
-	cmd.Stdin = bytes.NewReader(reqBytes)
-
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(10 * time.Minute))
+	if _, err := conn.Write(append(reqBytes, '\n')); err != nil {
 		return nil, err
-	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start mlx_worker: %w", err)
 	}
 
 	var finalResp ScoreResponse
 	var collected []WorkerScoreResult
-	scanner := bufio.NewScanner(stdoutPipe)
+	scanner := bufio.NewScanner(conn)
 	buf := make([]byte, 0, 1024*1024)
 	scanner.Buffer(buf, 16*1024*1024)
 
@@ -805,11 +1018,11 @@ func ScoreMultiStreamingViaMLX(
 			continue
 		}
 		var envelope struct {
-			Type    string            `json:"type"`
-			Status  string            `json:"status"`
-			OK      *bool             `json:"ok"`
-			Error   string            `json:"error"`
-			Result  WorkerScoreResult `json:"result"`
+			Type    string              `json:"type"`
+			Status  string              `json:"status"`
+			OK      *bool               `json:"ok"`
+			Error   string              `json:"error"`
+			Result  WorkerScoreResult   `json:"result"`
 			Results []WorkerScoreResult `json:"results"`
 		}
 		if err := json.Unmarshal(line, &envelope); err != nil {
@@ -828,28 +1041,28 @@ func ScoreMultiStreamingViaMLX(
 		case "done":
 			finalResp.OK = true
 			finalResp.Results = envelope.Results
+			return &finalResp, nil
 		default:
 			if envelope.OK != nil && !*envelope.OK {
-				_ = cmd.Wait()
 				return nil, fmt.Errorf("mlx_worker error: %s", envelope.Error)
 			}
 			if envelope.OK != nil && *envelope.OK && len(envelope.Results) > 0 {
 				finalResp.OK = true
 				finalResp.Results = envelope.Results
+				return &finalResp, nil
 			}
 		}
 	}
-
-	if err := cmd.Wait(); err != nil {
-		return nil, fmt.Errorf("mlx_worker failed: %v (%s)", err, strings.TrimSpace(stderr.String()))
+	if err := scanner.Err(); err != nil {
+		return nil, err
 	}
 	if !finalResp.OK {
 		if len(collected) > 0 {
 			finalResp.OK = true
 			finalResp.Results = collected
-		} else {
-			return nil, fmt.Errorf("mlx_worker exited without valid done message (%s)", strings.TrimSpace(stderr.String()))
+			return &finalResp, nil
 		}
+		return nil, fmt.Errorf("socket connection closed without done payload")
 	}
 	return &finalResp, nil
 }

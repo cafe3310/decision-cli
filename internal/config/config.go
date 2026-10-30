@@ -75,6 +75,20 @@ func DefaultRegistry() map[string]types.ModelSpec {
 			ApproxMemoryGB:         3.5,
 			Description:            "Gemma-4-E4B-it (4-bit MLX Dense + Vision) — Multimodal Ultra-Fast Lightweight Judge",
 		},
+		"ling-3.0-tiny": {
+			Alias:                  "ling-3.0-tiny",
+			HFRepoID:               "rapid-mlx/Ling-3.0-tiny-MLX-4bit",
+			PromptStyle:            "ling-binary",
+			SupportsVision:         false,
+			PositiveTokens:         []string{"是", "Yes", "yes", "YES"},
+			NegativeTokens:         []string{"否", "No", "no", "NO"},
+			CalibrationTemperature: 1.5,
+			ChoiceTemperature:      2.0,
+			ScoreTemperature:       1.5,
+			DefaultThreshold:       0.5,
+			ApproxMemoryGB:         4.8,
+			Description:            "Ling-3.0-Tiny (4-bit MLX MoE, 1.3B active) — Ultra-Fast Hybrid KDA/MLA Judge",
+		},
 	}
 }
 
@@ -214,6 +228,7 @@ models:
     gemma-4-26b-a4b: ""
     gemma-4-e4b: ""
     qwen3-reranker-4b: ""
+    ling-3.0-tiny: ""
 
   # Automatic scan directories searched in order when models.paths[model-name] is empty.
   # Supports both HuggingFace Hub cache structure (models--org--repo/snapshots/<hash>)
@@ -261,6 +276,18 @@ models:
       default_threshold: 0.5
       approx_memory_gb: 2.5
       description: "Qwen3-Reranker-4B (4-bit MLX) — Cross-Encoder Pointwise Rubric Scorer"
+    ling-3.0-tiny:
+      alias: "ling-3.0-tiny"
+      hf_repo_id: "rapid-mlx/Ling-3.0-tiny-MLX-4bit"
+      prompt_style: "ling-binary"
+      positive_tokens: ["是", "Yes", "yes", "YES"]
+      negative_tokens: ["否", "No", "no", "NO"]
+      calibration_temperature: 1.5
+      choice_temperature: 2.0
+      score_temperature: 1.5
+      default_threshold: 0.5
+      approx_memory_gb: 4.8
+      description: "Ling-3.0-Tiny (4-bit MLX MoE, 1.3B active) — Ultra-Fast Hybrid KDA/MLA Judge"
 
 # 3. Deterministic SQLite Content-Addressable Cache
 cache:

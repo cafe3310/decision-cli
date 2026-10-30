@@ -25,9 +25,12 @@
 | 模型名称 | 模型类型 / 激活参数量 | Easy Acc (48题) | Standard Acc (72题) | Hard Acc (111题) | 综合准确率 (231题) | 单条耗时 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | ling-3.0-tiny (轻量) | MoE+线性注意力 (总 7.9B / 激活 1.3B) | 97.9% | 83.3% | 48.6% | 69.7% | ~45 ms |
-| qwen3-reranker-4b | Dense (4B) | 97.9% | 69.4% | 18.2% | 50.6% | ~52 ms |
-| gemma-4-e4b (轻量) | Dense (4.5B) | 97.9% | 97.2% | 42.1% | 71.0% | ~65 ms |
+| qwen3-reranker-4b | Dense (4B) | 97.9% | 69.4% | 35.1% | 58.9% | ~52 ms |
+| gemma-4-e4b (轻量) | Dense (4.5B) | 97.9% | 97.2% | 50.5% | 74.9% | ~65 ms |
 | gemma-4-26b-a4b (主力) | MoE (总 26B / 激活 3.8B) | 100.0% | 100.0% | 68.5% | 84.8% | ~170 ms |
+
+> [!NOTE]
+> 评测数据基于官方公开 JevBench 231 题（Easy 48 题 / Standard 72 题 / Hard 111 题）。各模型单步前向原始结果归档于 `bench/results/jevbench_public_231_eval_results.json`（`ling-3.0-tiny` 归档于 `bench/results/bench_run_20261030_201008.json`）。全量复现评测可执行 `python3 bench/run_full_eval.py`。
 
 ### 2.2 多模态视觉评测 (900 项判定)
 

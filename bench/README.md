@@ -101,4 +101,4 @@ bench/
 ## 4. 已知评测事实与结果档案
 
 查看详细的历史评测事实、准确率对比与分层 ECE 误差，请参阅：
-[`bench/results/summary.md`](file:///Users/sipan/workspace/decision-cli/bench/results/summary.md)。
+[`bench/results/summary.md`](results/summary.md)。

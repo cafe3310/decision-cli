@@ -214,12 +214,8 @@ func EvaluateSingleChoice(cfg *types.AppConfig, store *cache.Store, opts Options
 	if modelErr != nil {
 		return nil, modelErr
 	}
-	rt := infra.ResolveRuntime(cfg)
-	if !rt.Valid {
-		return nil, fmt.Errorf("MLX runtime unavailable: %s", rt.Error)
-	}
 
-	resp, err := infra.ScoreMultiViaMLX(cfg, rt, rm, infra.WorkerMultiParams{
+	resp, err := infra.ScoreMultiViaMLX(cfg, nil, rm, infra.WorkerMultiParams{
 		Primitive:   "choice",
 		Rubrics:     opts.Rubrics,
 		Choices:     opts.Choices,
@@ -339,12 +335,8 @@ func EvaluateSingleScore(cfg *types.AppConfig, store *cache.Store, opts Options,
 	if modelErr != nil {
 		return nil, modelErr
 	}
-	rt := infra.ResolveRuntime(cfg)
-	if !rt.Valid {
-		return nil, fmt.Errorf("MLX runtime unavailable: %s", rt.Error)
-	}
 
-	resp, err := infra.ScoreMultiViaMLX(cfg, rt, rm, infra.WorkerMultiParams{
+	resp, err := infra.ScoreMultiViaMLX(cfg, nil, rm, infra.WorkerMultiParams{
 		Primitive:   "score",
 		Rubrics:     opts.Rubrics,
 		ScoreLevels: opts.ScoreLevels,
@@ -485,12 +477,7 @@ func EvaluateSingle(cfg *types.AppConfig, store *cache.Store, opts Options, cont
 		return nil, modelErr
 	}
 
-	rt := infra.ResolveRuntime(cfg)
-	if !rt.Valid {
-		return nil, fmt.Errorf("MLX runtime unavailable: %s", rt.Error)
-	}
-
-	resp, err := infra.ScoreMultiViaMLX(cfg, rt, rm, infra.WorkerMultiParams{
+	resp, err := infra.ScoreMultiViaMLX(cfg, nil, rm, infra.WorkerMultiParams{
 		Primitive:   "noul",
 		Rubrics:     opts.Rubrics,
 		ImageTokens: normImgTokens,
@@ -560,6 +547,7 @@ func EvaluateSingle(cfg *types.AppConfig, store *cache.Store, opts Options, cont
 // consulting SQLite cache first and dispatching only cache misses to the MLX worker in a single model load.
 func EvaluateBatch(cfg *types.AppConfig, store *cache.Store, opts Options, items []types.BatchItemInput) (*types.BatchDecisionReport, error) {
 	t0 := time.Now()
+	infra.EnsureStatusBarRunning()
 	prim := opts.Primitive
 	if prim == "" {
 		prim = "noul"
@@ -711,11 +699,6 @@ func EvaluateBatch(cfg *types.AppConfig, store *cache.Store, opts Options, items
 		if modelErr != nil {
 			return nil, modelErr
 		}
-		rt := infra.ResolveRuntime(cfg)
-		if !rt.Valid {
-			return nil, fmt.Errorf("MLX runtime unavailable: %s", rt.Error)
-		}
-
 		normRubrics := cache.NormalizeText(opts.Rubrics)
 		rubricHash := cache.HashString(normRubrics)
 		freshDoneItems := 0
@@ -787,7 +770,7 @@ func EvaluateBatch(cfg *types.AppConfig, store *cache.Store, opts Options, items
 			}
 		}
 
-		_, err := infra.ScoreMultiStreamingViaMLX(cfg, rt, rm, infra.WorkerMultiParams{
+		_, err := infra.ScoreMultiStreamingViaMLX(cfg, nil, rm, infra.WorkerMultiParams{
 			Primitive:   prim,
 			Rubrics:     opts.Rubrics,
 			Choices:     opts.Choices,
@@ -1055,11 +1038,7 @@ func EvaluateSystemOne(cfg *types.AppConfig, store *cache.Store, baseOpts Option
 		if modelErr != nil {
 			return nil, modelErr
 		}
-		rt := infra.ResolveRuntime(cfg)
-		if !rt.Valid {
-			return nil, fmt.Errorf("MLX runtime unavailable: %s", rt.Error)
-		}
-		resp, err := infra.ScoreMultiViaMLX(cfg, rt, rm, infra.WorkerMultiParams{
+		resp, err := infra.ScoreMultiViaMLX(cfg, nil, rm, infra.WorkerMultiParams{
 			Primitive:   "noul",
 			DebiasOrder: baseOpts.DebiasOrder,
 			ImageTokens: normSysImgTokens,

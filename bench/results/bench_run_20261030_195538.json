@@ -1,0 +1,461 @@
+{
+  "ling-3.0-tiny": {
+    "mini_bench": {
+      "model": "ling-3.0-tiny",
+      "total": 12,
+      "correct": 12,
+      "accuracy": 1.0,
+      "items": [
+        {
+          "id": "doc-01-api-guide",
+          "expected": "是",
+          "predicted": "是",
+          "correct": true,
+          "confidence": 0.9181,
+          "category": "A-文档诉求(显式正例)"
+        },
+        {
+          "id": "doc-02-cookbook-request",
+          "expected": "是",
+          "predicted": "是",
+          "correct": true,
+          "confidence": 0.9487,
+          "category": "A-文档诉求(隐式教程正例)"
+        },
+        {
+          "id": "doc-03-pure-praise-noise",
+          "expected": "否",
+          "predicted": "否",
+          "correct": true,
+          "confidence": 0.6418,
+          "category": "A-文档诉求(纯夸奖负例)"
+        },
+        {
+          "id": "doc-04-weights-bug-trap",
+          "expected": "否",
+          "predicted": "否",
+          "correct": true,
+          "confidence": 0.6608,
+          "category": "A-文档诉求(近邻干扰：权重乱码报错而非文档缺失)"
+        },
+        {
+          "id": "quant-05-gguf-mlx",
+          "expected": "是",
+          "predicted": "是",
+          "correct": true,
+          "confidence": 0.989,
+          "category": "B-量化与终端适配(正例)"
+        },
+        {
+          "id": "quant-06-llama-cpp-pr",
+          "expected": "是",
+          "predicted": "是",
+          "correct": true,
+          "confidence": 0.7144,
+          "category": "B-量化与终端适配(架构支持正例)"
+        },
+        {
+          "id": "quant-07-cloud-api-rate-limit",
+          "expected": "否",
+          "predicted": "否",
+          "correct": true,
+          "confidence": 0.9751,
+          "category": "B-量化与终端适配(近邻干扰：云端API限流而非本地部署)"
+        },
+        {
+          "id": "quant-08-finetune-lora",
+          "expected": "否",
+          "predicted": "否",
+          "correct": true,
+          "confidence": 0.5826,
+          "category": "B-量化与终端适配(近邻干扰：训练微调诉求)"
+        },
+        {
+          "id": "biz-09-bank-procurement",
+          "expected": "是",
+          "predicted": "是",
+          "correct": true,
+          "confidence": 0.977,
+          "category": "C-商业与生态合作(企业采购正例)"
+        },
+        {
+          "id": "biz-10-platform-integration",
+          "expected": "是",
+          "predicted": "是",
+          "correct": true,
+          "confidence": 0.9298,
+          "category": "C-商业与生态合作(平台集成正例)"
+        },
+        {
+          "id": "biz-11-individual-question",
+          "expected": "否",
+          "predicted": "否",
+          "correct": true,
+          "confidence": 0.9966,
+          "category": "C-商业与生态合作(个人开发者普通提问负例)"
+        },
+        {
+          "id": "biz-12-competitor-comparison",
+          "expected": "否",
+          "predicted": "否",
+          "correct": true,
+          "confidence": 0.9982,
+          "category": "C-商业与生态合作(技术横评负例)"
+        }
+      ]
+    },
+    "path_a": {
+      "model": "ling-3.0-tiny",
+      "choice_task": {
+        "total": 15,
+        "forward_acc": 1.0,
+        "reverse_acc": 0.8,
+        "order_consistency_rate": 0.8,
+        "cases": [
+          {
+            "id": "mc-01-api-guide",
+            "expected": "docs",
+            "forward_choice": "docs",
+            "forward_match": true,
+            "reverse_choice": "bug_quality",
+            "reverse_match": false,
+            "order_consistent": false,
+            "forward_top_prob": 0.5902,
+            "reverse_top_prob": 0.5278
+          },
+          {
+            "id": "mc-02-cookbook",
+            "expected": "docs",
+            "forward_choice": "docs",
+            "forward_match": true,
+            "reverse_choice": "bug_quality",
+            "reverse_match": false,
+            "order_consistent": false,
+            "forward_top_prob": 0.5267,
+            "reverse_top_prob": 0.3612
+          },
+          {
+            "id": "mc-03-praise",
+            "expected": "general_chat",
+            "forward_choice": "general_chat",
+            "forward_match": true,
+            "reverse_choice": "general_chat",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.6925,
+            "reverse_top_prob": 0.7953
+          },
+          {
+            "id": "mc-04-garbled-output",
+            "expected": "bug_quality",
+            "forward_choice": "bug_quality",
+            "forward_match": true,
+            "reverse_choice": "bug_quality",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.8333,
+            "reverse_top_prob": 0.7354
+          },
+          {
+            "id": "mc-05-gguf-mlx",
+            "expected": "quant_local",
+            "forward_choice": "quant_local",
+            "forward_match": true,
+            "reverse_choice": "quant_local",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.9148,
+            "reverse_top_prob": 0.7715
+          },
+          {
+            "id": "mc-06-llama-cpp",
+            "expected": "quant_local",
+            "forward_choice": "quant_local",
+            "forward_match": true,
+            "reverse_choice": "quant_local",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.4585,
+            "reverse_top_prob": 0.3068
+          },
+          {
+            "id": "mc-07-rate-limit-429",
+            "expected": "bug_quality",
+            "forward_choice": "bug_quality",
+            "forward_match": true,
+            "reverse_choice": "bug_quality",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.7673,
+            "reverse_top_prob": 0.5191
+          },
+          {
+            "id": "mc-08-lora-factory",
+            "expected": "finetune",
+            "forward_choice": "finetune",
+            "forward_match": true,
+            "reverse_choice": "finetune",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.7719,
+            "reverse_top_prob": 0.8442
+          },
+          {
+            "id": "mc-09-bank-procurement",
+            "expected": "business",
+            "forward_choice": "business",
+            "forward_match": true,
+            "reverse_choice": "business",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.6092,
+            "reverse_top_prob": 0.9413
+          },
+          {
+            "id": "mc-10-openrouter-partner",
+            "expected": "business",
+            "forward_choice": "business",
+            "forward_match": true,
+            "reverse_choice": "business",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.5024,
+            "reverse_top_prob": 0.8449
+          },
+          {
+            "id": "mc-11-student-license",
+            "expected": "general_chat",
+            "forward_choice": "general_chat",
+            "forward_match": true,
+            "reverse_choice": "general_chat",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.5776,
+            "reverse_top_prob": 0.9227
+          },
+          {
+            "id": "mc-12-benchmark-chat",
+            "expected": "general_chat",
+            "forward_choice": "general_chat",
+            "forward_match": true,
+            "reverse_choice": "general_chat",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.8043,
+            "reverse_top_prob": 0.8828
+          },
+          {
+            "id": "mc-13-spring-ai-doc",
+            "expected": "docs",
+            "forward_choice": "docs",
+            "forward_match": true,
+            "reverse_choice": "bug_quality",
+            "reverse_match": false,
+            "order_consistent": false,
+            "forward_top_prob": 0.6439,
+            "reverse_top_prob": 0.4539
+          },
+          {
+            "id": "mc-14-hospital-onprem",
+            "expected": "business",
+            "forward_choice": "business",
+            "forward_match": true,
+            "reverse_choice": "business",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.6138,
+            "reverse_top_prob": 0.9769
+          },
+          {
+            "id": "mc-15-rlhf-verl",
+            "expected": "finetune",
+            "forward_choice": "finetune",
+            "forward_match": true,
+            "reverse_choice": "finetune",
+            "reverse_match": true,
+            "order_consistent": true,
+            "forward_top_prob": 0.5432,
+            "reverse_top_prob": 0.5098
+          }
+        ]
+      },
+      "score_task": {
+        "total": 10,
+        "exact_acc": 0.0,
+        "mae": 0.3921,
+        "cases": [
+          {
+            "id": "sc-01-praise",
+            "expected_level": 0,
+            "predicted_level": 1.4513,
+            "exact_match": false,
+            "absolute_error": 1.4513,
+            "top_prob": 0.3792,
+            "all_level_probs": {
+              "0": 0.3792,
+              "1": 0.2116,
+              "2": 0.1395,
+              "3": 0.1181,
+              "4": 0.1516
+            }
+          },
+          {
+            "id": "sc-02-chat",
+            "expected_level": 0,
+            "predicted_level": 0.4114,
+            "exact_match": false,
+            "absolute_error": 0.4114,
+            "top_prob": 0.7514,
+            "all_level_probs": {
+              "0": 0.7514,
+              "1": 0.1543,
+              "2": 0.0442,
+              "3": 0.0317,
+              "4": 0.0184
+            }
+          },
+          {
+            "id": "sc-03-license",
+            "expected_level": 1,
+            "predicted_level": 0.8719,
+            "exact_match": false,
+            "absolute_error": 0.1281,
+            "top_prob": 0.7006,
+            "all_level_probs": {
+              "0": 0.2182,
+              "1": 0.7006,
+              "2": 0.0738,
+              "3": 0.0058,
+              "4": 0.0015
+            }
+          },
+          {
+            "id": "sc-04-param-question",
+            "expected_level": 1,
+            "predicted_level": 0.9682,
+            "exact_match": false,
+            "absolute_error": 0.03180000000000005,
+            "top_prob": 0.739,
+            "all_level_probs": {
+              "0": 0.1517,
+              "1": 0.739,
+              "2": 0.1,
+              "3": 0.0079,
+              "4": 0.0014
+            }
+          },
+          {
+            "id": "sc-05-doc-request",
+            "expected_level": 2,
+            "predicted_level": 1.2568,
+            "exact_match": false,
+            "absolute_error": 0.7432000000000001,
+            "top_prob": 0.3512,
+            "all_level_probs": {
+              "0": 0.2315,
+              "1": 0.3512,
+              "2": 0.3512,
+              "3": 0.061,
+              "4": 0.005
+            }
+          },
+          {
+            "id": "sc-06-mlx-request",
+            "expected_level": 2,
+            "predicted_level": 1.7524,
+            "exact_match": false,
+            "absolute_error": 0.24760000000000004,
+            "top_prob": 0.2945,
+            "all_level_probs": {
+              "0": 0.1941,
+              "1": 0.211,
+              "2": 0.2945,
+              "3": 0.2493,
+              "4": 0.0512
+            }
+          },
+          {
+            "id": "sc-07-garbled-bug",
+            "expected_level": 3,
+            "predicted_level": 3.6194,
+            "exact_match": false,
+            "absolute_error": 0.6194000000000002,
+            "top_prob": 0.7399,
+            "all_level_probs": {
+              "0": 0.0093,
+              "1": 0.0368,
+              "2": 0.0189,
+              "3": 0.195,
+              "4": 0.7399
+            }
+          },
+          {
+            "id": "sc-08-bank-lead",
+            "expected_level": 3,
+            "predicted_level": 2.9101,
+            "exact_match": false,
+            "absolute_error": 0.08990000000000009,
+            "top_prob": 0.424,
+            "all_level_probs": {
+              "0": 0.0528,
+              "1": 0.1118,
+              "2": 0.132,
+              "3": 0.2795,
+              "4": 0.424
+            }
+          },
+          {
+            "id": "sc-09-prod-outage",
+            "expected_level": 4,
+            "predicted_level": 3.9137,
+            "exact_match": false,
+            "absolute_error": 0.08630000000000004,
+            "top_prob": 0.9553,
+            "all_level_probs": {
+              "0": 0.0044,
+              "1": 0.0125,
+              "2": 0.0033,
+              "3": 0.0244,
+              "4": 0.9553
+            }
+          },
+          {
+            "id": "sc-10-double-charge-angry",
+            "expected_level": 4,
+            "predicted_level": 3.8884,
+            "exact_match": false,
+            "absolute_error": 0.11160000000000014,
+            "top_prob": 0.9492,
+            "all_level_probs": {
+              "0": 0.0079,
+              "1": 0.0167,
+              "2": 0.0039,
+              "3": 0.0223,
+              "4": 0.9492
+            }
+          }
+        ]
+      }
+    },
+    "jevbench_public": {
+      "model": "ling-3.0-tiny",
+      "total_items": 231,
+      "overall_accuracy": 0.4545,
+      "elapsed_seconds": 467.87,
+      "tier_breakdown": {
+        "easy": {
+          "total": 48,
+          "accuracy": 0.75
+        },
+        "standard": {
+          "total": 72,
+          "accuracy": 0.5694
+        },
+        "hard": {
+          "total": 111,
+          "accuracy": 0.2523
+        }
+      }
+    }
+  }
+}

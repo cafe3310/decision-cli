@@ -77,6 +77,8 @@ func FindRelatedMLXProcesses(cfg *types.AppConfig) ([]MLXProcessInfo, error) {
 		isRelated := false
 		if strings.Contains(fullCmd, "mlx_worker.py") {
 			isRelated = true
+		} else if strings.Contains(fullCmd, "decision-cli bar") {
+			isRelated = true
 		} else if strings.Contains(fullCmd, "worker.sock") && strings.Contains(fullCmd, "decision-cli") {
 			isRelated = true
 		} else if strings.Contains(fullCmd, "mlx") && strings.Contains(fullCmd, "decision-cli") {

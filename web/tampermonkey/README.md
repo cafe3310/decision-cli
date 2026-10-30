@@ -4,7 +4,7 @@
 
 ---
 
-## 1. 核心特性
+## 1. 主要特性
 
 - 🎯 **双重划选模式（批量拖拽标注 vs 连续自动判定）**：
   - **📋 批量拖拽标注（Batch Drag & Annotate）**：
@@ -40,7 +40,7 @@ decision-cli serve
 🚀 decision-cli SystemOne API 服务已启动
    - 监听地址 : http://127.0.0.1:8080
    - 默认模型 : gemma-4-26b-a4b
-   - 核心端点 : POST http://127.0.0.1:8080/v1/systemone
+   - 服务端点 : POST http://127.0.0.1:8080/v1/systemone
    - 快捷端点 : POST /v1/noun, /v1/choose, /v1/score
    - 健康检查 : GET http://127.0.0.1:8080/health
 ```
@@ -48,7 +48,7 @@ decision-cli serve
 ### 步骤 2：安装油猴脚本
 1. 在 Chrome / Edge / Safari / Firefox 中安装 [Tampermonkey](https://www.tampermonkey.net/)（或 ScriptCat / Violentmonkey）；
 2. 打开 Tampermonkey 管理面板，点击「添加新脚本」；
-3. 将 [decision-highlighter.user.js](file:///Users/sipan/workspace/decision-cli/web/tampermonkey/decision-highlighter.user.js) 的完整代码复制并粘贴进去，按 `Cmd+S` / `Ctrl+S` 保存。
+3. 将 [decision-highlighter.user.js](decision-highlighter.user.js) 的完整代码复制并粘贴进去，按 `Cmd+S` / `Ctrl+S` 保存。
 
 ### 步骤 3：在任意网页上使用
 1. 打开任意网页（如知乎、推特、新闻博客，或本地测试页 `open web/tampermonkey/test_page.html`）；

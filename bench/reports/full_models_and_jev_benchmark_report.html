@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>决策模型基准评测大盘</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --page-bg: #f9fafb;
+      --card-bg: #ffffff;
+      --border: #e5e7eb;
+      --text: #111827;
+      --text-muted: #64748b;
+      --font-serif: "Newsreader", Georgia, serif;
+      --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "JetBrains Mono", Menlo, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--page-bg);
+      color: var(--text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      padding: 40px 32px 80px;
+    }
+
+    .max-container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    /* Editorial Header */
+    .header-section {
+      margin-bottom: 32px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 38px;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+      line-height: 1.15;
+    }
+
+    .arrow-icon {
+      font-size: 26px;
+      color: #94a3b8;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #64748b;
+      line-height: 1.6;
+      max-width: 900px;
+    }
+
+    .color-legend {
+      display: flex;
+      gap: 18px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 12.5px;
+      color: #475569;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+
+    .legend-dashed {
+      width: 12px;
+      height: 12px;
+      border: 1.5px dashed #94a3b8;
+      background: #f8fafc;
+      border-radius: 2px;
+    }
+
+    /* Two-column Chart Grid */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(560px, 1fr));
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    /* Chart Card */
+    .chart-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px 28px 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 24px;
+    }
+
+    .card-header h3 {
+      font-family: var(--font-serif);
+      font-size: 18px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+
+    .card-header p {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .card-unit-badge {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: #64748b;
+      background: #f1f5f9;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    /* Chart Canvas */
+    .chart-container {
+      position: relative;
+      height: 280px;
+      width: 100%;
+      margin-bottom: 96px; /* Space for angled labels */
+    }
+
+    .grid-lines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .grid-line {
+      width: 100%;
+      border-bottom: 1px dashed #e2e8f0;
+      position: relative;
+    }
+
+    .grid-label {
+      position: absolute;
+      right: 0;
+      top: -9px;
+      font-size: 10px;
+      color: #94a3b8;
+      font-family: var(--font-mono);
+    }
+
+    .bars-wrapper {
+      position: absolute;
+      top: 0;
+      left: 16px;
+      right: 36px;
+      bottom: 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-around;
+      gap: 12px;
+    }
+
+    .bar-column {
+      flex: 1;
+      max-width: 72px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      position: relative;
+    }
+
+    .bar-fill {
+      width: 100%;
+      border-radius: 5px 5px 0 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 8px;
+      transition: height 0.3s ease, filter 0.15s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      cursor: pointer;
+    }
+    .bar-fill:hover {
+      filter: brightness(1.08);
+    }
+
+    .bar-score {
+      color: #ffffff;
+      font-size: 13.5px;
+      font-weight: 700;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      user-select: none;
+      font-family: var(--font-mono);
+    }
+
+    .bar-footer {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 10px;
+      width: 110px;
+      pointer-events: none;
+    }
+
+    .model-label-rotated {
+      transform-origin: top left;
+      transform: rotate(50deg) translate(6px, 2px);
+      white-space: nowrap;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #1e293b;
+      letter-spacing: -0.01em;
+      text-align: left;
+      width: 120px;
+    }
+
+    .model-label-sub {
+      display: block;
+      font-size: 9.5px;
+      font-weight: 400;
+      color: #64748b;
+      margin-top: 1px;
+    }
+
+    footer {
+      margin-top: 50px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      color: #94a3b8;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="max-container">
+
+    <!-- Header Section -->
+    <header class="header-section">
+      <div class="title-row">
+        <h1>决策模型基准评测报告</h1>
+        <span class="arrow-icon">↗</span>
+      </div>
+      <p class="subtitle">
+        基于 Apple Silicon MLX 单步 Logit 读取与远端 Jev 接口，对 6 款决策模型在文本判别、多模态视觉决策、推理延迟及本地硬件开销（内存与 GPU 占用）进行全维度实测对比。
+      </p>
+
+      <div class="color-legend">
+        <span style="font-weight: 600; color: #1e293b;">图例指定配色：</span>
+        <div class="legend-item"><span class="legend-dashed"></span> Jev (虚框灰色)</div>
+        <div class="legend-item"><span class="legend-dot" style="background: #64748b;"></span> Qwen (灰色)</div>
+        <div class="legend-item"><span class="legend-dot" style="background: #2563eb;"></span> 百灵 (蓝色)</div>
+        <div class="legend-item"><span class="legend-dot" style="background: #a855f7;"></span> Gemma (浅紫色)</div>
+      </div>
+    </header>
+
+    <div class="charts-grid">
+      
+        <div class="chart-card">
+          <div class="card-header">
+            <div>
+              <h3>1. JevBench Public 综合准确率，越大越好</h3>
+              <p>覆盖 Easy、Standard、Hard 三层难度与二元/多分类/量规三种决策原语（231 题公开集）</p>
+            </div>
+            <div class="card-unit-badge">%</div>
+          </div>
+          <div class="chart-container">
+            <div class="grid-lines">
+              <div class="grid-line"><span class="grid-label">100%</span></div><div class="grid-line"><span class="grid-label">75%</span></div><div class="grid-line"><span class="grid-label">50%</span></div><div class="grid-line"><span class="grid-label">25%</span></div><div class="grid-line"><span class="grid-label">0%</span></div>
+            </div>
+            <div class="bars-wrapper">
+              
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 87.01%; border: 2px dashed #94a3b8; border-bottom: none; background-color: #f8fafc;" title="TypeSafe Jev 1.13.0 (网络 • Jev 1.13): 87.0%">
+                <span class="bar-score" style="color: #334155; text-shadow: none;">87.0</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  TypeSafe Jev 1.13.0
+                  <span class="model-label-sub">网络 • Jev 1.13</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 85.71%; background-color: #a855f7;" title="Gemma 4 26B-A4B (本地 • 28BA4B): 85.7%">
+                <span class="bar-score" style="color: #ffffff;">85.7</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 26B-A4B
+                  <span class="model-label-sub">本地 • 28BA4B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 74.46000000000001%; background-color: #c084fc;" title="Gemma 4 E4B (本地 • 4.5B): 74.5%">
+                <span class="bar-score" style="color: #ffffff;">74.5</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 E4B
+                  <span class="model-label-sub">本地 • 4.5B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 71.86%; background-color: #2563eb;" title="Ling-3.0-Tiny (本地 • 8BA1.3B): 71.9%">
+                <span class="bar-score" style="color: #ffffff;">71.9</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Ling-3.0-Tiny
+                  <span class="model-label-sub">本地 • 8BA1.3B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 57.58%; background-color: #64748b;" title="Qwen3 Reranker 4B (本地 • 4BDense): 57.6%">
+                <span class="bar-score" style="color: #ffffff;">57.6</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Qwen3 Reranker 4B
+                  <span class="model-label-sub">本地 • 4BDense</span>
+                </div>
+              </div>
+            </div>
+            
+            </div>
+          </div>
+        </div>
+        
+
+      
+        <div class="chart-card">
+          <div class="card-header">
+            <div>
+              <h3>2. 文本推理延迟中位数，越小越好</h3>
+              <p>跳过缓存，真实单步前向耗时（单位：毫秒）</p>
+            </div>
+            <div class="card-unit-badge"> ms</div>
+          </div>
+          <div class="chart-container">
+            <div class="grid-lines">
+              <div class="grid-line"><span class="grid-label">300 ms</span></div><div class="grid-line"><span class="grid-label">225 ms</span></div><div class="grid-line"><span class="grid-label">150 ms</span></div><div class="grid-line"><span class="grid-label">75 ms</span></div><div class="grid-line"><span class="grid-label">0 ms</span></div>
+            </div>
+            <div class="bars-wrapper">
+              
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 36.82333333333334%; background-color: #2563eb;" title="Ling-3.0-Tiny (本地 • 8BA1.3B): 110.5 ms">
+                <span class="bar-score" style="color: #ffffff;">110.5</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Ling-3.0-Tiny
+                  <span class="model-label-sub">本地 • 8BA1.3B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 50.470000000000006%; background-color: #64748b;" title="Qwen3 Reranker 4B (本地 • 4BDense): 151.4 ms">
+                <span class="bar-score" style="color: #ffffff;">151.4</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Qwen3 Reranker 4B
+                  <span class="model-label-sub">本地 • 4BDense</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 65.03%; background-color: #c084fc;" title="Gemma 4 E4B (本地 • 4.5B): 195.1 ms">
+                <span class="bar-score" style="color: #ffffff;">195.1</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 E4B
+                  <span class="model-label-sub">本地 • 4.5B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 74.42666666666666%; background-color: #a855f7;" title="Gemma 4 26B-A4B (本地 • 28BA4B): 223.3 ms">
+                <span class="bar-score" style="color: #ffffff;">223.3</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 26B-A4B
+                  <span class="model-label-sub">本地 • 28BA4B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 81.0%; border: 2px dashed #94a3b8; border-bottom: none; background-color: #f8fafc;" title="TypeSafe Jev 1.13.0 (网络 • Jev 1.13): 243.0 ms">
+                <span class="bar-score" style="color: #334155; text-shadow: none;">243.0</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  TypeSafe Jev 1.13.0
+                  <span class="model-label-sub">网络 • Jev 1.13</span>
+                </div>
+              </div>
+            </div>
+            
+            </div>
+          </div>
+        </div>
+        
+
+      
+        <div class="chart-card">
+          <div class="card-header">
+            <div>
+              <h3>3. 多模态综合准确率，越大越好</h3>
+              <p>涵盖存在性核验、四选一细粒度分类与候选框空间定位（ImageJev-box 900 题）</p>
+            </div>
+            <div class="card-unit-badge">%</div>
+          </div>
+          <div class="chart-container">
+            <div class="grid-lines">
+              <div class="grid-line"><span class="grid-label">100%</span></div><div class="grid-line"><span class="grid-label">75%</span></div><div class="grid-line"><span class="grid-label">50%</span></div><div class="grid-line"><span class="grid-label">25%</span></div><div class="grid-line"><span class="grid-label">0%</span></div>
+            </div>
+            <div class="bars-wrapper">
+              
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 88.89%; background-color: #a855f7;" title="Gemma 4 26B-A4B (本地 • 28BA4B): 88.9%">
+                <span class="bar-score" style="color: #ffffff;">88.9</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 26B-A4B
+                  <span class="model-label-sub">本地 • 28BA4B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 85.11%; background-color: #c084fc;" title="Gemma 4 E4B (本地 • 4.5B): 85.1%">
+                <span class="bar-score" style="color: #ffffff;">85.1</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 E4B
+                  <span class="model-label-sub">本地 • 4.5B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 81.14%; border: 2px dashed #94a3b8; border-bottom: none; background-color: #f8fafc;" title="TypeSafe Jev 1.13.0 (网络 • Jev 1.13): 81.1%">
+                <span class="bar-score" style="color: #334155; text-shadow: none;">81.1</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  TypeSafe Jev 1.13.0
+                  <span class="model-label-sub">网络 • Jev 1.13</span>
+                </div>
+              </div>
+            </div>
+            
+            </div>
+          </div>
+        </div>
+        
+
+      
+        <div class="chart-card">
+          <div class="card-header">
+            <div>
+              <h3>4. 空间候选框定位准确率，越大越好</h3>
+              <p>根据视觉目标空间坐标与边界框执行精确定位决策（仅对支持模型）</p>
+            </div>
+            <div class="card-unit-badge">%</div>
+          </div>
+          <div class="chart-container">
+            <div class="grid-lines">
+              <div class="grid-line"><span class="grid-label">100%</span></div><div class="grid-line"><span class="grid-label">75%</span></div><div class="grid-line"><span class="grid-label">50%</span></div><div class="grid-line"><span class="grid-label">25%</span></div><div class="grid-line"><span class="grid-label">0%</span></div>
+            </div>
+            <div class="bars-wrapper">
+              
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 90.0%; background-color: #a855f7;" title="Gemma 4 26B-A4B (本地 • 28BA4B): 90.0%">
+                <span class="bar-score" style="color: #ffffff;">90.0</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 26B-A4B
+                  <span class="model-label-sub">本地 • 28BA4B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 77.66999999999999%; background-color: #c084fc;" title="Gemma 4 E4B (本地 • 4.5B): 77.7%">
+                <span class="bar-score" style="color: #ffffff;">77.7</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 E4B
+                  <span class="model-label-sub">本地 • 4.5B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 75.7%; border: 2px dashed #94a3b8; border-bottom: none; background-color: #f8fafc;" title="TypeSafe Jev 1.13.0 (网络 • Jev 1.13): 75.7%">
+                <span class="bar-score" style="color: #334155; text-shadow: none;">75.7</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  TypeSafe Jev 1.13.0
+                  <span class="model-label-sub">网络 • Jev 1.13</span>
+                </div>
+              </div>
+            </div>
+            
+            </div>
+          </div>
+        </div>
+        
+
+      
+        <div class="chart-card">
+          <div class="card-header">
+            <div>
+              <h3>5. 多模态单步延迟中位数，越小越好</h3>
+              <p>包含冷启动视觉编码与 Warm Cache 命中状态耗时对比（单位：毫秒）</p>
+            </div>
+            <div class="card-unit-badge"> ms</div>
+          </div>
+          <div class="chart-container">
+            <div class="grid-lines">
+              <div class="grid-line"><span class="grid-label">900 ms</span></div><div class="grid-line"><span class="grid-label">675 ms</span></div><div class="grid-line"><span class="grid-label">450 ms</span></div><div class="grid-line"><span class="grid-label">225 ms</span></div><div class="grid-line"><span class="grid-label">0 ms</span></div>
+            </div>
+            <div class="bars-wrapper">
+              
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 39.12555555555555%; background-color: #c084fc;" title="Gemma 4 E4B (缓存命中 • 本地 • 4.5B): 352.1 ms">
+                <span class="bar-score" style="color: #ffffff;">352.1</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 E4B
+                  <span class="model-label-sub">缓存命中 • 本地 • 4.5B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 41.120000000000005%; background-color: #a855f7;" title="Gemma 4 26B-A4B (缓存命中 • 本地 • 28BA4B): 370.1 ms">
+                <span class="bar-score" style="color: #ffffff;">370.1</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 26B-A4B
+                  <span class="model-label-sub">缓存命中 • 本地 • 28BA4B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 41.857777777777784%; background-color: #c084fc;" title="Gemma 4 E4B (冷启动编码 • 本地 • 4.5B): 376.7 ms">
+                <span class="bar-score" style="color: #ffffff;">376.7</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 E4B
+                  <span class="model-label-sub">冷启动编码 • 本地 • 4.5B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 72.22222222222221%; border: 2px dashed #94a3b8; border-bottom: none; background-color: #f8fafc;" title="TypeSafe Jev 1.13.0 (云端平均 • 网络 • Jev 1.13): 650.0 ms">
+                <span class="bar-score" style="color: #334155; text-shadow: none;">650.0</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  TypeSafe Jev 1.13.0
+                  <span class="model-label-sub">云端平均 • 网络 • Jev 1.13</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 64.69666666666667%; background-color: #a855f7;" title="Gemma 4 26B-A4B (冷启动编码 • 本地 • 28BA4B): 582.3 ms">
+                <span class="bar-score" style="color: #ffffff;">582.3</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 26B-A4B
+                  <span class="model-label-sub">冷启动编码 • 本地 • 28BA4B</span>
+                </div>
+              </div>
+            </div>
+            
+            </div>
+          </div>
+        </div>
+        
+
+      
+        <div class="chart-card">
+          <div class="card-header">
+            <div>
+              <h3>6. 总物理内存占用峰值，越小越好</h3>
+              <p>涵盖 mlx_worker、状态栏与 CLI 客户端物理内存峰值之和（libproc.h 精确采样）</p>
+            </div>
+            <div class="card-unit-badge"> GB</div>
+          </div>
+          <div class="chart-container">
+            <div class="grid-lines">
+              <div class="grid-line"><span class="grid-label">20 GB</span></div><div class="grid-line"><span class="grid-label">15 GB</span></div><div class="grid-line"><span class="grid-label">10 GB</span></div><div class="grid-line"><span class="grid-label">5 GB</span></div><div class="grid-line"><span class="grid-label">0 GB</span></div>
+            </div>
+            <div class="bars-wrapper">
+              
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 20.4208984375%; background-color: #64748b;" title="Qwen3 Reranker 4B (本地 • 4BDense): 4.08 GB">
+                <span class="bar-score" style="color: #ffffff;">4.08</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Qwen3 Reranker 4B
+                  <span class="model-label-sub">本地 • 4BDense</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 46.23046875%; background-color: #c084fc;" title="Gemma 4 E4B (本地 • 4.5B): 9.25 GB">
+                <span class="bar-score" style="color: #ffffff;">9.25</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 E4B
+                  <span class="model-label-sub">本地 • 4.5B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 98.0%; background-color: #a855f7;" title="Gemma 4 26B-A4B (本地 • 28BA4B): 19.76 GB">
+                <span class="bar-score" style="color: #ffffff;">19.76</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 26B-A4B
+                  <span class="model-label-sub">本地 • 28BA4B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 78.025390625%; background-color: #2563eb;" title="Ling-3.0-Tiny (本地 • 8BA1.3B): 15.61 GB">
+                <span class="bar-score" style="color: #ffffff;">15.61</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Ling-3.0-Tiny
+                  <span class="model-label-sub">本地 • 8BA1.3B</span>
+                </div>
+              </div>
+            </div>
+            
+            </div>
+          </div>
+        </div>
+        
+
+      
+        <div class="chart-card">
+          <div class="card-header">
+            <div>
+              <h3>7. GPU 平均利用率</h3>
+              <p>推理活跃期内 Metal GPU 算力核心平均利用率（IOAccelerator 实时采样）</p>
+            </div>
+            <div class="card-unit-badge">%</div>
+          </div>
+          <div class="chart-container">
+            <div class="grid-lines">
+              <div class="grid-line"><span class="grid-label">100%</span></div><div class="grid-line"><span class="grid-label">75%</span></div><div class="grid-line"><span class="grid-label">50%</span></div><div class="grid-line"><span class="grid-label">25%</span></div><div class="grid-line"><span class="grid-label">0%</span></div>
+            </div>
+            <div class="bars-wrapper">
+              
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 96.2%; background-color: #c084fc;" title="Gemma 4 E4B (本地 • 4.5B): 96.2%">
+                <span class="bar-score" style="color: #ffffff;">96.2</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 E4B
+                  <span class="model-label-sub">本地 • 4.5B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 96.8%; background-color: #64748b;" title="Qwen3 Reranker 4B (本地 • 4BDense): 96.8%">
+                <span class="bar-score" style="color: #ffffff;">96.8</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Qwen3 Reranker 4B
+                  <span class="model-label-sub">本地 • 4BDense</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 96.0%; background-color: #2563eb;" title="Ling-3.0-Tiny (本地 • 8BA1.3B): 96.0%">
+                <span class="bar-score" style="color: #ffffff;">96.0</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Ling-3.0-Tiny
+                  <span class="model-label-sub">本地 • 8BA1.3B</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bar-column">
+              <div class="bar-fill" style="height: 89.7%; background-color: #a855f7;" title="Gemma 4 26B-A4B (本地 • 28BA4B): 89.7%">
+                <span class="bar-score" style="color: #ffffff;">89.7</span>
+              </div>
+              <div class="bar-footer">
+                <div class="model-label-rotated">
+                  Gemma 4 26B-A4B
+                  <span class="model-label-sub">本地 • 28BA4B</span>
+                </div>
+              </div>
+            </div>
+            
+            </div>
+          </div>
+        </div>
+        
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <div>decision-cli • macOS Apple Silicon 本地单步概率决策评测</div>
+      <div>评测时间: 2026-10-30 21:21:40 | 硬件平台: Apple M5 Pro (15-Core CPU, Metal 4 GPU, 48 GB Unified Memory)</div>
+    </footer>
+
+  </div>
+
+</body>
+</html>

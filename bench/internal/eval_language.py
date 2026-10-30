@@ -298,6 +298,17 @@ def task_to_worker_item(task) -> dict:
         raise ValueError(f"Unknown qtype: {qtype}")
 
 
+def normalize_eval_label(val) -> str:
+    if val is None:
+        return ""
+    s = str(val).strip().lower()
+    if s in ("true", "yes", "1", "t", "y"):
+        return "true"
+    if s in ("false", "no", "0", "f", "n"):
+        return "false"
+    return s
+
+
 def run_jevbench_public_eval(model: str, cli_bin: str, limit: Optional[int] = None) -> Dict[str, Any]:
     """Runs official JevBench 231-item public evaluation using `decision-cli systemone`."""
     if not (DATA_DIR / "easy.jsonl").exists():
@@ -367,7 +378,7 @@ def run_jevbench_public_eval(model: str, cli_bin: str, limit: Optional[int] = No
             elif ans.get("type") == "score":
                 pred = str(int(round(ans.get("score", 0.0))))
 
-            is_correct = (str(pred).lower() == str(gold).lower()) if gold is not None else False
+            is_correct = (normalize_eval_label(pred) == normalize_eval_label(gold)) if gold is not None else False
             tier_stats[tier]["total"] += 1
             if is_correct:
                 tier_stats[tier]["correct"] += 1

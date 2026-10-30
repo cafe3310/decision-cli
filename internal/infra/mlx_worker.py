@@ -387,19 +387,25 @@ def apply_chat_or_raw(tokenizer, prompt_style: str, user_msg: str) -> str:
     if hasattr(tokenizer, "apply_chat_template"):
         try:
             messages = [{"role": "user", "content": user_msg}]
-            return tokenizer.apply_chat_template(
+            rendered = tokenizer.apply_chat_template(
                 messages,
                 tokenize=False,
                 add_generation_prompt=True,
                 enable_thinking=False,
             )
+            if rendered.endswith("<think>\n") or rendered.endswith("<think>"):
+                rendered += "\n</think>\n"
+            return rendered
         except Exception:
             try:
-                return tokenizer.apply_chat_template(
+                rendered = tokenizer.apply_chat_template(
                     messages,
                     tokenize=False,
                     add_generation_prompt=True,
                 )
+                if rendered.endswith("<think>\n") or rendered.endswith("<think>"):
+                    rendered += "\n</think>\n"
+                return rendered
             except Exception:
                 pass
     return (
@@ -421,6 +427,15 @@ def build_prompt(tokenizer, prompt_style: str, rubrics: str, context: str, has_i
             "<|im_start|>assistant\n"
             "<think>\n\n</think>\n\n"
         )
+    if prompt_style == "ling-binary":
+        user_msg = (
+            "你是一个精确的文本分类与判别器。请严格根据【判定准则 (Rubric)】判断【待测文本 (Context)】是否符合要求。\n"
+            "严格仅回答一个字：“是”或“否”，严禁包含任何思考过程、解释或多余符号。\n\n"
+            f"【判定准则 (Rubric)】\n{rubrics}\n\n"
+            f"【待测文本 (Context)】\n{context}\n\n"
+            "【判定结果（仅回答“是”或“否”）】"
+        )
+        return apply_chat_or_raw(tokenizer, prompt_style, user_msg)
     target_label = "【待测内容与图像 (Context)】" if has_images else "【待测文本 (Context)】"
     role_desc = "你是一个精确的多模态图文分类与判别器。" if has_images else "你是一个精确的文本分类与判别器。"
     user_msg = (
@@ -499,6 +514,24 @@ def resolve_candidate_token_ids(tokenizer, token_strs):
     return sorted(ids)
 
 
+def sanitize_model_config(model_path: str):
+    """Automatically fix known upstream config typing discrepancies (e.g. integer kda_lower_bound in Ling)."""
+    cfg_file = os.path.join(model_path, "config.json")
+    if os.path.isfile(cfg_file):
+        try:
+            with open(cfg_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            modified = False
+            if "kda_lower_bound" in data and isinstance(data["kda_lower_bound"], int):
+                data["kda_lower_bound"] = float(data["kda_lower_bound"])
+                modified = True
+            if modified:
+                with open(cfg_file, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+        except Exception:
+            pass
+
+
 class ModelCache:
     def __init__(self):
         self.loaded_path = None
@@ -506,8 +539,33 @@ class ModelCache:
         self.tokenizer = None
         self.vision_runner = None
 
+    def clear(self):
+        if self.model is not None:
+            del self.model
+            self.model = None
+        if self.tokenizer is not None:
+            del self.tokenizer
+            self.tokenizer = None
+        if self.vision_runner is not None:
+            del self.vision_runner
+            self.vision_runner = None
+        self.loaded_path = None
+        import gc
+        gc.collect()
+        try:
+            mx.clear_cache()
+        except Exception:
+            pass
+        try:
+            mx.metal.clear_cache()
+        except Exception:
+            pass
+
     def get(self, model_path: str):
         if self.loaded_path != model_path or self.model is None:
+            if self.model is not None:
+                self.clear()
+            sanitize_model_config(model_path)
             model, tokenizer = load(model_path)
             self.model = model
             self.tokenizer = tokenizer
@@ -523,6 +581,143 @@ class ModelCache:
 
 
 MODEL_CACHE = ModelCache()
+
+
+class ModelArbiter:
+    """Manages global singleton MLX model residency, mutex locking, queue depth and status monitoring."""
+
+    def __init__(self, status_path: str = ""):
+        import threading
+        self.status_path = status_path
+        self.lock = threading.Lock()
+        self.cond = threading.Condition(self.lock)
+        self.current_model_path = ""
+        self.current_model_alias = ""
+        self.active_count = 0
+        self.queue_length = 0
+        self.state = "idle"
+        self.total_decisions = 0
+        self.recent_latencies = []
+        self.max_latencies = 30
+
+    def set_status_path(self, path: str):
+        self.status_path = path
+        self._write_status_unlocked()
+
+    def derive_alias(self, path: str) -> str:
+        if not path:
+            return "未加载"
+        b = os.path.basename(path.rstrip("/"))
+        if "gemma-4-26b-a4b" in b or "gemma-4-26b-a4b" in path:
+            return "gemma-4-26b-a4b"
+        if "gemma-4-e4b" in b or "gemma-4-e4b" in path:
+            return "gemma-4-e4b"
+        if "ling-3.0-tiny" in b or "ling-3.0-tiny" in path:
+            return "ling-3.0-tiny"
+        if "Qwen3-Reranker-4B" in b or "Qwen3-Reranker-4B" in path:
+            return "qwen3-reranker-4b"
+        return b[:20]
+
+    def record_decision(self, latency_ms: float):
+        with self.lock:
+            self.total_decisions += 1
+            self.queue_length = max(0, self.queue_length - 1)
+            if latency_ms > 0:
+                self.recent_latencies.append(latency_ms)
+                if len(self.recent_latencies) > self.max_latencies:
+                    self.recent_latencies.pop(0)
+            self._write_status_unlocked()
+
+    def acquire_for_model(self, target_model_path: str, num_items: int = 1):
+        with self.cond:
+            self.queue_length += num_items
+            self._write_status_unlocked()
+
+            # Serialize GPU execution while allowing concurrent requests to queue and report queue_length
+            while self.active_count > 0:
+                if self.current_model_path and self.current_model_path != target_model_path:
+                    self.state = "draining"
+                    self._write_status_unlocked()
+                self.cond.wait()
+
+            # Switch model if needed
+            if self.current_model_path != target_model_path:
+                self.state = "switching"
+                self._write_status_unlocked()
+                MODEL_CACHE.clear()
+                self.current_model_path = target_model_path
+                self.current_model_alias = self.derive_alias(target_model_path)
+                MODEL_CACHE.get(target_model_path)
+
+            self.active_count += 1
+            self.state = "inferring"
+            self._write_status_unlocked()
+
+    def release_for_model(self, remaining_items: int = 0):
+        with self.cond:
+            self.active_count = max(0, self.active_count - 1)
+            if remaining_items > 0:
+                self.queue_length = max(0, self.queue_length - remaining_items)
+            if self.active_count == 0 and self.queue_length == 0:
+                self.state = "idle"
+            self._write_status_unlocked()
+            self.cond.notify_all()
+
+    def _get_rss_mb(self) -> int:
+        try:
+            import resource
+            rusage = resource.getrusage(resource.RUSAGE_SELF)
+            return int(rusage.ru_maxrss // (1024 * 1024))
+        except Exception:
+            return 0
+
+    def _write_status_unlocked(self):
+        if not self.status_path:
+            return
+        avg_lat = 0.0
+        if self.recent_latencies:
+            avg_lat = sum(self.recent_latencies) / len(self.recent_latencies)
+        tps = 0.0
+        if avg_lat > 0:
+            tps = round(1000.0 / avg_lat, 1)
+
+        cur_alias = self.current_model_alias
+        if not cur_alias and MODEL_CACHE.loaded_path:
+            cur_alias = self.derive_alias(MODEL_CACHE.loaded_path)
+        if not cur_alias:
+            cur_alias = "空闲"
+
+        payload = {
+            "pid": os.getpid(),
+            "state": self.state,
+            "current_model_alias": cur_alias,
+            "current_model_path": self.current_model_path or (MODEL_CACHE.loaded_path or ""),
+            "queue_length": self.queue_length,
+            "throughput_dps": tps,
+            "avg_latency_ms": round(avg_lat, 1),
+            "rss_mb": self._get_rss_mb(),
+            "total_decisions": self.total_decisions,
+            "updated_at": int(time.time()),
+        }
+        try:
+            tmp_path = self.status_path + f".tmp.{os.getpid()}"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False)
+            os.replace(tmp_path, self.status_path)
+        except Exception:
+            pass
+
+    def cleanup(self):
+        with self.lock:
+            if self.status_path and os.path.exists(self.status_path):
+                try:
+                    os.unlink(self.status_path)
+                except Exception:
+                    pass
+
+
+ARBITER = ModelArbiter()
+
 
 
 def forward_last_logits(model, input_ids: list[int], ordered_img_embs: list[mx.array] | None = None):
@@ -828,7 +1023,7 @@ def score_items_with_shared_prefix(
     return results
 
 
-def handle_score_request(req: dict, stream_stdout: bool = False) -> dict:
+def handle_score_request(req: dict, stream_stdout: bool = False, on_item_cb = None) -> dict:
     model_path = req["model_path"]
     prompt_style = req.get("prompt_style", "gemma4-binary")
     default_prim = req.get("primitive", "noul")
@@ -839,40 +1034,79 @@ def handle_score_request(req: dict, stream_stdout: bool = False) -> dict:
     default_image_tokens = int(req.get("image_tokens") or 280)
     items = req.get("items", [])
 
-    if stream_stdout:
-        sys.stdout.write(
-            json.dumps({"type": "status", "status": "loading_model", "model_path": model_path}, ensure_ascii=False)
-            + "\n"
+    # Acquire model lock & queue depth via ModelArbiter (waits if different model is running)
+    completed_items = 0
+    ARBITER.acquire_for_model(model_path, len(items))
+    try:
+        if stream_stdout:
+            sys.stdout.write(
+                json.dumps({"type": "status", "status": "loading_model", "model_path": model_path}, ensure_ascii=False)
+                + "\n"
+            )
+            sys.stdout.flush()
+
+        model, tokenizer = MODEL_CACHE.get(model_path)
+        if any(bool(it.get("images")) for it in items):
+            MODEL_CACHE.get_vision_runner(model_path)
+        pos_tokens = req.get("positive_tokens") or ["是", "Yes", "yes", "YES"]
+        neg_tokens = req.get("negative_tokens") or ["否", "No", "no", "NO"]
+        pos_ids = resolve_candidate_token_ids(tokenizer, pos_tokens)
+        neg_ids = resolve_candidate_token_ids(tokenizer, neg_tokens)
+
+        if stream_stdout:
+            sys.stdout.write(
+                json.dumps({"type": "status", "status": "scoring", "total": len(items)}, ensure_ascii=False) + "\n"
+            )
+            sys.stdout.flush()
+
+        common_context = items[0].get("context", "") if items else ""
+        is_shared_context = (
+            len(items) >= 2
+            and bool(common_context)
+            and len(common_context) >= 60
+            and not any(bool(it.get("images")) for it in items)
+            and all(it.get("context") == common_context for it in items)
+            and prompt_style in ("gemma4-binary", "ling-binary")
         )
-        sys.stdout.flush()
 
-    model, tokenizer = MODEL_CACHE.get(model_path)
-    if any(bool(it.get("images")) for it in items):
-        MODEL_CACHE.get_vision_runner(model_path)
-    pos_tokens = req.get("positive_tokens") or ["是", "Yes", "yes", "YES"]
-    neg_tokens = req.get("negative_tokens") or ["否", "No", "no", "NO"]
-    pos_ids = resolve_candidate_token_ids(tokenizer, pos_tokens)
-    neg_ids = resolve_candidate_token_ids(tokenizer, neg_tokens)
+        if is_shared_context:
+            try:
+                shared_results = score_items_with_shared_prefix(
+                    model_path,
+                    model,
+                    tokenizer,
+                    prompt_style,
+                    default_prim,
+                    default_rubrics,
+                    default_choices,
+                    default_levels,
+                    default_debias,
+                    pos_ids,
+                    neg_ids,
+                    items,
+                    stream_stdout=stream_stdout,
+                )
+                for res_obj in shared_results:
+                    ARBITER.record_decision(res_obj.get("latency_ms", 0.0))
+                    completed_items += 1
+                    if on_item_cb:
+                        on_item_cb(res_obj)
+                return {
+                    "ok": True,
+                    "type": "done",
+                    "mode": "shared_prefix_prefill",
+                    "primitive": default_prim,
+                    "model_path": model_path,
+                    "pos_token_ids": pos_ids,
+                    "neg_token_ids": neg_ids,
+                    "results": shared_results,
+                }
+            except Exception as exc:
+                pass
 
-    if stream_stdout:
-        sys.stdout.write(
-            json.dumps({"type": "status", "status": "scoring", "total": len(items)}, ensure_ascii=False) + "\n"
-        )
-        sys.stdout.flush()
-
-    common_context = items[0].get("context", "") if items else ""
-    is_shared_context = (
-        len(items) >= 2
-        and bool(common_context)
-        and len(common_context) >= 60
-        and not any(bool(it.get("images")) for it in items)
-        and all(it.get("context") == common_context for it in items)
-        and prompt_style in ("gemma4-binary",)
-    )
-
-    if is_shared_context:
-        try:
-            shared_results = score_items_with_shared_prefix(
+        results = []
+        for item in items:
+            res_obj = score_single_item(
                 model_path,
                 model,
                 tokenizer,
@@ -882,58 +1116,43 @@ def handle_score_request(req: dict, stream_stdout: bool = False) -> dict:
                 default_choices,
                 default_levels,
                 default_debias,
+                default_image_tokens,
                 pos_ids,
                 neg_ids,
-                items,
-                stream_stdout=stream_stdout,
+                item,
             )
-            return {
-                "ok": True,
-                "type": "done",
-                "mode": "shared_prefix_prefill",
-                "primitive": default_prim,
-                "model_path": model_path,
-                "pos_token_ids": pos_ids,
-                "neg_token_ids": neg_ids,
-                "results": shared_results,
-            }
-        except Exception as exc:
+            ARBITER.record_decision(res_obj.get("latency_ms", 0.0))
+            completed_items += 1
+            results.append(res_obj)
+            if completed_items % 8 == 0:
+                try:
+                    mx.clear_cache()
+                except Exception:
+                    pass
+            if on_item_cb:
+                on_item_cb(res_obj)
+            if stream_stdout:
+                sys.stdout.write(json.dumps({"type": "item", "result": res_obj}, ensure_ascii=False) + "\n")
+                sys.stdout.flush()
+
+        return {
+            "ok": True,
+            "type": "done",
+            "primitive": default_prim,
+            "model_path": model_path,
+            "pos_token_ids": pos_ids,
+            "neg_token_ids": neg_ids,
+            "results": results,
+        }
+    finally:
+        try:
+            mx.clear_cache()
+        except Exception:
             pass
-
-    results = []
-    for item in items:
-        res_obj = score_single_item(
-            model_path,
-            model,
-            tokenizer,
-            prompt_style,
-            default_prim,
-            default_rubrics,
-            default_choices,
-            default_levels,
-            default_debias,
-            default_image_tokens,
-            pos_ids,
-            neg_ids,
-            item,
-        )
-        results.append(res_obj)
-        if stream_stdout:
-            sys.stdout.write(json.dumps({"type": "item", "result": res_obj}, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
-
-    return {
-        "ok": True,
-        "type": "done",
-        "primitive": default_prim,
-        "model_path": model_path,
-        "pos_token_ids": pos_ids,
-        "neg_token_ids": neg_ids,
-        "results": results,
-    }
+        ARBITER.release_for_model(max(0, len(items) - completed_items))
 
 
-def dispatch_request(req: dict, stream_stdout: bool = False) -> dict:
+def dispatch_request(req: dict, stream_stdout: bool = False, on_item_cb = None) -> dict:
     action = req.get("action", "score")
     if action == "ping":
         return {
@@ -942,7 +1161,7 @@ def dispatch_request(req: dict, stream_stdout: bool = False) -> dict:
             "pid": os.getpid(),
         }
     elif action == "score":
-        return handle_score_request(req, stream_stdout=stream_stdout)
+        return handle_score_request(req, stream_stdout=stream_stdout, on_item_cb=on_item_cb)
     elif action == "shutdown":
         return {"ok": True, "shutdown": True}
     else:
@@ -950,6 +1169,8 @@ def dispatch_request(req: dict, stream_stdout: bool = False) -> dict:
 
 
 def serve_socket(sock_path: str, idle_timeout: float):
+    import threading
+
     if os.path.exists(sock_path):
         try:
             os.unlink(sock_path)
@@ -957,56 +1178,85 @@ def serve_socket(sock_path: str, idle_timeout: float):
             pass
     os.makedirs(os.path.dirname(sock_path), exist_ok=True)
 
+    status_path = os.path.join(os.path.dirname(sock_path), "worker_status.json")
+    ARBITER.set_status_path(status_path)
+
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     srv.bind(sock_path)
-    srv.listen(8)
+    srv.listen(32)
     srv.settimeout(1.0)
 
-    last_active = time.time()
-    should_exit = False
+    state_lock = threading.Lock()
+    last_active = [time.time()]
+    should_exit = [False]
+
+    def handle_client(conn):
+        with conn:
+            data = b""
+            while True:
+                chunk = conn.recv(65536)
+                if not chunk:
+                    break
+                data += chunk
+                if b"\n" in chunk:
+                    break
+            if not data:
+                return
+            try:
+                req = json.loads(data.decode("utf-8").strip())
+                is_streaming = bool(req.get("stream", False))
+
+                def stream_item_cb(res_obj):
+                    try:
+                        line = (json.dumps({"type": "item", "result": res_obj}, ensure_ascii=False) + "\n").encode("utf-8")
+                        conn.sendall(line)
+                    except Exception:
+                        pass
+
+                cb = stream_item_cb if is_streaming else None
+                resp = dispatch_request(req, stream_stdout=False, on_item_cb=cb)
+                if resp.get("shutdown"):
+                    with state_lock:
+                        should_exit[0] = True
+            except Exception as e:
+                resp = {
+                    "ok": False,
+                    "error": str(e),
+                    "traceback": traceback.format_exc(),
+                }
+            payload = (json.dumps(resp, ensure_ascii=False) + "\n").encode("utf-8")
+            try:
+                conn.sendall(payload)
+            except Exception:
+                pass
+        with state_lock:
+            last_active[0] = time.time()
 
     try:
-        while not should_exit:
-            if idle_timeout > 0 and (time.time() - last_active) > idle_timeout:
+        while True:
+            with state_lock:
+                if should_exit[0]:
+                    break
+                idle_sec = time.time() - last_active[0]
+            if idle_timeout > 0 and idle_sec > idle_timeout and ARBITER.active_count == 0 and ARBITER.queue_length == 0:
                 break
             try:
                 conn, _ = srv.accept()
             except socket.timeout:
                 continue
 
-            last_active = time.time()
-            with conn:
-                data = b""
-                while True:
-                    chunk = conn.recv(65536)
-                    if not chunk:
-                        break
-                    data += chunk
-                    if b"\n" in chunk:
-                        break
-                if not data:
-                    continue
-                try:
-                    req = json.loads(data.decode("utf-8").strip())
-                    resp = dispatch_request(req)
-                    if resp.get("shutdown"):
-                        should_exit = True
-                except Exception as e:
-                    resp = {
-                        "ok": False,
-                        "error": str(e),
-                        "traceback": traceback.format_exc(),
-                    }
-                payload = (json.dumps(resp, ensure_ascii=False) + "\n").encode("utf-8")
-                conn.sendall(payload)
-            last_active = time.time()
+            with state_lock:
+                last_active[0] = time.time()
+            threading.Thread(target=handle_client, args=(conn,), daemon=True).start()
     finally:
         srv.close()
+        ARBITER.cleanup()
         if os.path.exists(sock_path):
             try:
                 os.unlink(sock_path)
             except OSError:
                 pass
+
 
 
 def main():

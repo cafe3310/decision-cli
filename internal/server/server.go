@@ -420,7 +420,7 @@ func RunServer(opts ServerOptions) error {
 	fmt.Fprintf(os.Stderr, "🚀 decision-cli SystemOne API 服务已启动\n")
 	fmt.Fprintf(os.Stderr, "   - 监听地址 : http://%s\n", addr)
 	fmt.Fprintf(os.Stderr, "   - 默认模型 : %s\n", modelName)
-	fmt.Fprintf(os.Stderr, "   - 核心端点 : POST http://%s/v1/systemone\n", addr)
+	fmt.Fprintf(os.Stderr, "   - 服务端点 : POST http://%s/v1/systemone\n", addr)
 	fmt.Fprintf(os.Stderr, "   - 快捷端点 : POST /v1/noun, /v1/choose, /v1/score\n")
 	fmt.Fprintf(os.Stderr, "   - 健康检查 : GET http://%s/health\n", addr)
 	fmt.Fprintf(os.Stderr, "   - 退出服务 : 按 Ctrl+C 优雅关闭\n\n")

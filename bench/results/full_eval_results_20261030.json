@@ -1,0 +1,435 @@
+{
+  "evaluated_at": "2026-10-30 21:21:40",
+  "hardware": "Apple M5 Pro (15-Core CPU, Metal 4 GPU, 48 GB Unified Memory)",
+  "runtime": "MLX 0.32.4 / mlx-lm 0.32.2 (Single-step Prefill Logit Reader)",
+  "local_models": {
+    "gemma-4-26b-a4b": {
+      "alias": "gemma-4-26b-a4b",
+      "arch": "26B MoE (3.8B 激活, 4-bit MLX)",
+      "supports_vision": true,
+      "text": {
+        "total_text_decisions": 283,
+        "wall_time_s": 173.71,
+        "mini_bench": {
+          "total": 12,
+          "correct": 12,
+          "accuracy": 1.0
+        },
+        "path_a": {
+          "choice_forward_acc": 1.0,
+          "choice_reverse_acc": 1.0,
+          "choice_order_consistency": 1.0,
+          "score_exact_acc": 1.0,
+          "score_mae": 0.0
+        },
+        "jevbench_231": {
+          "total": 231,
+          "correct": 198,
+          "overall_acc": 0.8571,
+          "easy_acc": 1.0,
+          "standard_acc": 1.0,
+          "hard_acc": 0.7027,
+          "noul_acc": 0.8649,
+          "choice_acc": 0.8417,
+          "score_acc": 0.9444
+        },
+        "speed": {
+          "avg_ms": 612.18,
+          "p50_ms": 223.28,
+          "p95_ms": 3155.59,
+          "throughput_dps": 1.63
+        },
+        "hardware_usage": {
+          "samples_count": 925,
+          "memory": {
+            "worker_avg_mb": 14657.9,
+            "worker_peak_mb": 15306.2,
+            "bar_avg_mb": 16.0,
+            "bar_peak_mb": 16.0,
+            "cli_avg_mb": 4.9,
+            "cli_peak_mb": 5.4,
+            "total_avg_mb": 14678.8,
+            "total_peak_mb": 15327.6
+          },
+          "gpu": {
+            "device_avg_pct": 87.6,
+            "device_peak_pct": 100.0,
+            "renderer_avg_pct": 83.7,
+            "renderer_peak_pct": 100.0,
+            "driver_mem_avg_mb": 12673.2,
+            "driver_mem_peak_mb": 19443.2
+          }
+        }
+      },
+      "multimodal": {
+        "live_items": 72,
+        "live_accuracy": 0.8611,
+        "wall_time_s": 35.61,
+        "full_900_scores": {
+          "overall_acc": 0.8889,
+          "track1_verify_acc": 0.81,
+          "track2_classify_acc": 0.9567,
+          "track3_grounding_acc": 0.9,
+          "capability_score": 0.8889
+        },
+        "speed": {
+          "cold_vision_avg_ms": 744.61,
+          "cold_vision_p50_ms": 582.27,
+          "warm_cache_avg_ms": 368.21,
+          "warm_cache_p50_ms": 370.08,
+          "overall_avg_ms": 493.67,
+          "overall_p50_ms": 391.19,
+          "overall_p95_ms": 665.13,
+          "throughput_dps": 2.03
+        },
+        "hardware_usage": {
+          "samples_count": 224,
+          "memory": {
+            "worker_avg_mb": 17578.8,
+            "worker_peak_mb": 20207.1,
+            "bar_avg_mb": 15.9,
+            "bar_peak_mb": 16.0,
+            "cli_avg_mb": 6.9,
+            "cli_peak_mb": 6.9,
+            "total_avg_mb": 17601.6,
+            "total_peak_mb": 20229.9
+          },
+          "gpu": {
+            "device_avg_pct": 91.8,
+            "device_peak_pct": 100.0,
+            "renderer_avg_pct": 90.8,
+            "renderer_peak_pct": 100.0,
+            "driver_mem_avg_mb": 17197.9,
+            "driver_mem_peak_mb": 20704.2
+          }
+        }
+      },
+      "resource_summary": {
+        "memory": {
+          "worker_avg_mb": 16118.3,
+          "worker_peak_mb": 20207.1,
+          "bar_avg_mb": 15.9,
+          "bar_peak_mb": 16.0,
+          "cli_avg_mb": 6.9,
+          "cli_peak_mb": 6.9,
+          "total_avg_mb": 16140.2,
+          "total_peak_mb": 20229.9
+        },
+        "gpu": {
+          "text_avg_pct": 87.6,
+          "text_peak_pct": 100.0,
+          "mm_avg_pct": 91.8,
+          "mm_peak_pct": 100.0,
+          "overall_avg_pct": 89.7,
+          "overall_peak_pct": 100.0
+        }
+      }
+    },
+    "gemma-4-e4b": {
+      "alias": "gemma-4-e4b",
+      "arch": "4.5B Dense (4-bit MLX)",
+      "supports_vision": true,
+      "text": {
+        "total_text_decisions": 283,
+        "wall_time_s": 130.78,
+        "mini_bench": {
+          "total": 12,
+          "correct": 11,
+          "accuracy": 0.9167
+        },
+        "path_a": {
+          "choice_forward_acc": 0.9333,
+          "choice_reverse_acc": 0.9333,
+          "choice_order_consistency": 1.0,
+          "score_exact_acc": 1.0,
+          "score_mae": 0.0891
+        },
+        "jevbench_231": {
+          "total": 231,
+          "correct": 172,
+          "overall_acc": 0.7446,
+          "easy_acc": 0.9792,
+          "standard_acc": 0.9722,
+          "hard_acc": 0.4955,
+          "noul_acc": 0.7027,
+          "choice_acc": 0.7698,
+          "score_acc": 0.7222
+        },
+        "speed": {
+          "avg_ms": 460.68,
+          "p50_ms": 195.09,
+          "p95_ms": 1887.45,
+          "throughput_dps": 2.17
+        },
+        "hardware_usage": {
+          "samples_count": 831,
+          "memory": {
+            "worker_avg_mb": 5233.5,
+            "worker_peak_mb": 5916.1,
+            "bar_avg_mb": 15.7,
+            "bar_peak_mb": 15.7,
+            "cli_avg_mb": 4.7,
+            "cli_peak_mb": 5.3,
+            "total_avg_mb": 5253.9,
+            "total_peak_mb": 5937.1
+          },
+          "gpu": {
+            "device_avg_pct": 98.0,
+            "device_peak_pct": 100.0,
+            "renderer_avg_pct": 91.1,
+            "renderer_peak_pct": 100.0,
+            "driver_mem_avg_mb": 6873.7,
+            "driver_mem_peak_mb": 9810.1
+          }
+        }
+      },
+      "multimodal": {
+        "live_items": 72,
+        "live_accuracy": 0.875,
+        "wall_time_s": 28.56,
+        "full_900_scores": {
+          "overall_acc": 0.8511,
+          "track1_verify_acc": 0.86,
+          "track2_classify_acc": 0.9167,
+          "track3_grounding_acc": 0.7767,
+          "capability_score": 0.8511
+        },
+        "speed": {
+          "cold_vision_avg_ms": 478.73,
+          "cold_vision_p50_ms": 376.72,
+          "warm_cache_avg_ms": 354.16,
+          "warm_cache_p50_ms": 352.13,
+          "overall_avg_ms": 395.69,
+          "overall_p50_ms": 356.05,
+          "overall_p95_ms": 483.11,
+          "throughput_dps": 2.53
+        },
+        "hardware_usage": {
+          "samples_count": 176,
+          "memory": {
+            "worker_avg_mb": 7244.5,
+            "worker_peak_mb": 9445.4,
+            "bar_avg_mb": 15.7,
+            "bar_peak_mb": 15.7,
+            "cli_avg_mb": 6.8,
+            "cli_peak_mb": 6.9,
+            "total_avg_mb": 7267.1,
+            "total_peak_mb": 9468.0
+          },
+          "gpu": {
+            "device_avg_pct": 94.4,
+            "device_peak_pct": 100.0,
+            "renderer_avg_pct": 71.1,
+            "renderer_peak_pct": 100.0,
+            "driver_mem_avg_mb": 8461.5,
+            "driver_mem_peak_mb": 10900.8
+          }
+        }
+      },
+      "resource_summary": {
+        "memory": {
+          "worker_avg_mb": 6239.0,
+          "worker_peak_mb": 9445.4,
+          "bar_avg_mb": 15.7,
+          "bar_peak_mb": 15.7,
+          "cli_avg_mb": 6.8,
+          "cli_peak_mb": 6.9,
+          "total_avg_mb": 6260.5,
+          "total_peak_mb": 9468.0
+        },
+        "gpu": {
+          "text_avg_pct": 98.0,
+          "text_peak_pct": 100.0,
+          "mm_avg_pct": 94.4,
+          "mm_peak_pct": 100.0,
+          "overall_avg_pct": 96.2,
+          "overall_peak_pct": 100.0
+        }
+      }
+    },
+    "ling-3.0-tiny": {
+      "alias": "ling-3.0-tiny",
+      "arch": "7.9B MoE (1.3B 激活, KDA+MLA 4-bit)",
+      "supports_vision": false,
+      "text": {
+        "total_text_decisions": 283,
+        "wall_time_s": 57.63,
+        "mini_bench": {
+          "total": 12,
+          "correct": 12,
+          "accuracy": 1.0
+        },
+        "path_a": {
+          "choice_forward_acc": 1.0,
+          "choice_reverse_acc": 0.8,
+          "choice_order_consistency": 0.8,
+          "score_exact_acc": 0.7,
+          "score_mae": 0.3921
+        },
+        "jevbench_231": {
+          "total": 231,
+          "correct": 166,
+          "overall_acc": 0.7186,
+          "easy_acc": 0.9583,
+          "standard_acc": 0.8194,
+          "hard_acc": 0.5495,
+          "noul_acc": 0.7568,
+          "choice_acc": 0.7194,
+          "score_acc": 0.5556
+        },
+        "speed": {
+          "avg_ms": 201.15,
+          "p50_ms": 110.47,
+          "p95_ms": 718.77,
+          "throughput_dps": 4.97
+        },
+        "hardware_usage": {
+          "samples_count": 356,
+          "memory": {
+            "worker_avg_mb": 15654.2,
+            "worker_peak_mb": 15958.3,
+            "bar_avg_mb": 15.9,
+            "bar_peak_mb": 15.9,
+            "cli_avg_mb": 4.7,
+            "cli_peak_mb": 5.4,
+            "total_avg_mb": 15674.8,
+            "total_peak_mb": 15979.6
+          },
+          "gpu": {
+            "device_avg_pct": 96.0,
+            "device_peak_pct": 100.0,
+            "renderer_avg_pct": 51.9,
+            "renderer_peak_pct": 100.0,
+            "driver_mem_avg_mb": 19655.9,
+            "driver_mem_peak_mb": 23190.3
+          }
+        }
+      },
+      "multimodal": null,
+      "resource_summary": {
+        "memory": {
+          "worker_avg_mb": 15654.2,
+          "worker_peak_mb": 15958.3,
+          "bar_avg_mb": 15.9,
+          "bar_peak_mb": 15.9,
+          "cli_avg_mb": 4.7,
+          "cli_peak_mb": 5.4,
+          "total_avg_mb": 15674.8,
+          "total_peak_mb": 15979.6
+        },
+        "gpu": {
+          "text_avg_pct": 96.0,
+          "text_peak_pct": 100.0,
+          "mm_avg_pct": null,
+          "mm_peak_pct": null,
+          "overall_avg_pct": 96.0,
+          "overall_peak_pct": 100.0
+        }
+      }
+    },
+    "qwen3-reranker-4b": {
+      "alias": "qwen3-reranker-4b",
+      "arch": "4.0B Dense (Cross-Encoder 4-bit)",
+      "supports_vision": false,
+      "text": {
+        "total_text_decisions": 283,
+        "wall_time_s": 98.23,
+        "mini_bench": {
+          "total": 12,
+          "correct": 9,
+          "accuracy": 0.75
+        },
+        "path_a": {
+          "choice_forward_acc": 1.0,
+          "choice_reverse_acc": 1.0,
+          "choice_order_consistency": 1.0,
+          "score_exact_acc": 0.5,
+          "score_mae": 0.5695
+        },
+        "jevbench_231": {
+          "total": 231,
+          "correct": 133,
+          "overall_acc": 0.5758,
+          "easy_acc": 0.9792,
+          "standard_acc": 0.6389,
+          "hard_acc": 0.3604,
+          "noul_acc": 0.5405,
+          "choice_acc": 0.6115,
+          "score_acc": 0.4444
+        },
+        "speed": {
+          "avg_ms": 345.87,
+          "p50_ms": 151.41,
+          "p95_ms": 1370.01,
+          "throughput_dps": 2.89
+        },
+        "hardware_usage": {
+          "samples_count": 659,
+          "memory": {
+            "worker_avg_mb": 3541.4,
+            "worker_peak_mb": 4161.3,
+            "bar_avg_mb": 15.6,
+            "bar_peak_mb": 15.6,
+            "cli_avg_mb": 5.3,
+            "cli_peak_mb": 5.3,
+            "total_avg_mb": 3562.3,
+            "total_peak_mb": 4182.2
+          },
+          "gpu": {
+            "device_avg_pct": 96.8,
+            "device_peak_pct": 100.0,
+            "renderer_avg_pct": 75.3,
+            "renderer_peak_pct": 100.0,
+            "driver_mem_avg_mb": 5342.6,
+            "driver_mem_peak_mb": 7818.2
+          }
+        }
+      },
+      "multimodal": null,
+      "resource_summary": {
+        "memory": {
+          "worker_avg_mb": 3541.4,
+          "worker_peak_mb": 4161.3,
+          "bar_avg_mb": 15.6,
+          "bar_peak_mb": 15.6,
+          "cli_avg_mb": 5.3,
+          "cli_peak_mb": 5.3,
+          "total_avg_mb": 3562.3,
+          "total_peak_mb": 4182.2
+        },
+        "gpu": {
+          "text_avg_pct": 96.8,
+          "text_peak_pct": 100.0,
+          "mm_avg_pct": null,
+          "mm_peak_pct": null,
+          "overall_avg_pct": 96.8,
+          "overall_peak_pct": 100.0
+        }
+      }
+    }
+  },
+  "remote_models": {
+    "typesafe-jev-1.13.0": {
+      "name": "TypeSafe Jev 1.13.0 (官方云端标杆)",
+      "arch": "TypeSafe 官方 API / ImageJev Imajev-4B 参考",
+      "supports_vision": true,
+      "jevbench_231": {
+        "overall_acc": 0.8701,
+        "easy_acc": 1.0,
+        "standard_acc": 0.99,
+        "hard_acc": 0.741
+      },
+      "multimodal_ref": {
+        "model_note": "ImageJevBench v0.1.3 #1 Imajev-4B / #15 Jevify-26B",
+        "imajev_4b_open_acc": 0.8114,
+        "jevify_26b_open_acc": 0.8289
+      },
+      "speed": {
+        "avg_ms": 285.0,
+        "p50_ms": 243.0,
+        "p95_ms": 620.0,
+        "throughput_dps": 3.51
+      }
+    }
+  }
+}

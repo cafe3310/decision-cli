@@ -21,7 +21,7 @@ from bench.internal.eval_language import (
 from bench.internal.eval_multimodal import run_multimodal_eval
 from bench.internal.compare_board import compare_with_leaderboard
 
-DEFAULT_MODELS = ["gemma-4-26b-a4b", "gemma-4-e4b", "qwen3-reranker-4b"]
+DEFAULT_MODELS = ["gemma-4-26b-a4b", "gemma-4-e4b", "qwen3-reranker-4b", "ling-3.0-tiny"]
 MULTIMODAL_MODELS = ["gemma-4-26b-a4b", "gemma-4-e4b"]
 
 

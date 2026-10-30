@@ -4,16 +4,44 @@
 
 ---
 
-## 🌟 模型选型与多模态支持（默认主力：`gemma-4-26b-a4b`）
+## 模型选型与多模态支持（默认主力：`gemma-4-26b-a4b`）
 
 | 模型别名 | 底层权重 | 模态能力 | 内存占用 | 定位与推荐场景 |
 |---|---|---|---|---|
-| **`gemma-4-26b-a4b`** (默认主力) | `mlx-community/gemma-4-26b-a4b-it-4bit` | **多模态 (文本 + 单图/多图)** | ~15.3GB | 26B MoE（每 Token 激活 3.8B）+ 27 层 1152 维 Vision Tower。世界知识最大、逻辑与视觉判别精度最高，始终优先推荐 |
-| **`gemma-4-e4b`** (轻量备选) | `mlx-community/gemma-4-e4b-it-4bit` | **多模态 (文本 + 单图/多图)** | ~3.5GB | 4.5B Dense + 16 层 768 维 Vision Tower。适用于低内存环境下的文本与视觉轻量判别 |
+| **`gemma-4-26b-a4b`** (默认主力) | `mlx-community/gemma-4-26b-a4b-it-4bit` | **多模态 (文本 + 单图/多图)** | ~15.3GB | 26B MoE（每 Token 激活 3.8B）+ 27 层 1152 维 Vision Tower。逻辑与视觉判别精度最高，优先推荐 |
+| **`ling-3.0-tiny`** (端侧轻量) | `rapid-mlx/Ling-3.0-tiny-MLX-4bit` | **纯文本 (不支持 `--image`)** | ~4.8GB | 7.9B MoE（激活 1.3B）+ 3:1 KDA 线性注意力。前向速度最快（~45ms），适合纯文本高吞吐场景 |
+| **`gemma-4-e4b`** (轻量备选) | `mlx-community/gemma-4-e4b-it-4bit` | **多模态 (文本 + 单图/多图)** | ~3.5GB | 4.5B Dense + 16 层 768 维 Vision Tower。适用于受限内存环境下的文本与视觉轻量判别 |
 | **`qwen3-reranker-4b`** (纯文本备选) | `mlx-community/Qwen3-Reranker-4B-4bit` | **纯文本 (不支持 `--image`)** | ~2.5GB | 交叉编码器模型，仅适合纯文本简单二元检索匹配（传入 `--image` 会报错拦截） |
 
 - **自包含 Python/MLX 环境 (`~/.cache/decision-cli/venv`)**：
   - 项目默认使用完全自包含的 `~/.cache/decision-cli/venv` 虚拟环境（内含 `mlx`、`mlx-lm`、`pillow`），不依赖外部工作区环境。首次运行自动创建，也可随时运行 `decision-cli setup` 校验或修复。
+
+---
+
+## Agent 调用准则：批量文件优先 (Batch-First Rule)
+
+AI Agent 在需要执行多次或批量判断时，**严禁使用 Shell 循环逐条调用单条子命令**（如 `for x in ...; do decision-cli noun ...; done`）。
+
+### 为什么必须使用批量文件模式：
+1. **吞吐提升 5~10 倍**：批量模式在底层复用 KV Cache，采用连续流式单步推理，避免反复建立进程和 Socket 握手；
+2. **全局队列与状态栏监控**：批量提交的文件会被全局唯一 MLX Worker 纳入队列，macOS 菜单栏状态图标可实时观测整体进度、剩余队列与吞吐速度；
+3. **自动批量缓存寻址**：CLI 会对批量输入进行多并发 SQLite 缓存比对，已命中项毫秒级直接返回，未命中项自动聚合成紧凑批次送入 GPU。
+
+### 标准批量调用模版：
+1. 将待判定的多条数据组织为本地临时文件（推荐 `.jsonl` 或 `.json`）：
+   ```json
+   {"id": "item-001", "context": "第一段待评估文本..."}
+   {"id": "item-002", "context": "第二段待评估文本..."}
+   ```
+2. 调用对应的 `batch` 子命令处理，配合 `--progress` 输出实时流式进度：
+   ```bash
+   decision-cli batch noun \
+     --rubrics "判断文本是否为系统报错" \
+     --input ./items.jsonl \
+     --output ./results.jsonl \
+     --format jsonl \
+     --progress
+   ```
 
 ---
 
@@ -41,7 +69,7 @@
 
 ```bash
 decision-cli noun \
-  --rubrics "判断该反馈是否涉及核心支付功能的严重系统报错" \
+  --rubrics "判断该反馈是否涉及支付流程的严重系统报错" \
   --context "微信支付点击确认后一直转圈，最后提示错误码 5002，钱扣了但订单未生效"
 ```
 
@@ -91,7 +119,7 @@ decision-cli noun \
 
 ```bash
 decision-cli choose \
-  --rubrics "判断该用户反馈所属的核心诉求类型" \
+  --rubrics "判断该用户反馈所属的诉求类型" \
   --choices "bug:系统故障或白屏报错,feature:新功能提议或体验优化,sales:商业咨询或私有化部署,noise:闲聊无明确诉求" \
   --context "请问系统支持离线私有化部署到医疗内网吗？大概费用怎么核算？" \
   --debias-order
@@ -285,7 +313,7 @@ decision-cli batch choose \
 ```bash
 decision-cli batch score \
   --rubrics "工单处理紧急度评级" \
-  --levels "P3常规低优,P2重要跟进,P1高优阻断,P0核心崩溃即刻响应" \
+  --levels "P3常规低优,P2重要跟进,P1高优阻断,P0系统崩溃即刻响应" \
   --input bug-reports.yaml \
   --output bug-scores.yaml \
   --format yaml \
@@ -339,9 +367,9 @@ decision-cli systemone \
 
 ## 四、系统自检与运维子命令
 
-### 1. `decision-cli doctor` — 环境健康自检与金丝雀推理
+### 1. `decision-cli doctor` — 环境健康自检与基准样例推理
 
-自动检查 Apple Silicon 硬件、统一内存、配置文件、Python 虚拟环境与 MLX 版本，并对受支持模型执行显著用例（正向例、负向例、反转例）的金丝雀单步推理诊断：
+自动检查 Apple Silicon 硬件、统一内存、配置文件、Python 虚拟环境与 MLX 版本，并对受支持模型执行显著用例（正向例、负向例、反转例）的基准样例单步推理诊断：
 
 ```bash
 decision-cli doctor
@@ -424,19 +452,17 @@ echo "技术问题概率: $PROB"
 
 ---
 
-## 六、完全卸载与痕迹清理
+## 六、数据清理与卸载
 
-若需完全移除应用及其配置与缓存：
+系统提供内置命令用于停止后台常驻进程并清理本机生成的数据：
 ```bash
-# 1. 扫描并终止所有后台 MLX Worker 守护进程
-decision-cli kill
+# 终止后台 Worker 与状态栏，清理 ~/.cache/decision-cli 下的虚拟环境与 SQLite 缓存
+decision-cli uninstall
 
-# 2. 清除所有 SQLite 缓存数据库、Unix Socket 与自包含 Python 虚拟环境
-rm -rf ~/.cache/decision-cli
-
-# 3. 删除用户全局配置文件（可选）
-rm -rf ~/.config/decision-cli
-
-# 4. 删除已安装或编译的二进制执行文件
-rm -f /usr/local/bin/decision-cli bin/decision-cli
+# 非交互式执行，并一并移除全局配置文件 ~/.config/decision-cli
+decision-cli uninstall --yes --all
+```
+若需完全删除编译的二进制文件：
+```bash
+rm -f $(which decision-cli) bin/decision-cli
 ```
