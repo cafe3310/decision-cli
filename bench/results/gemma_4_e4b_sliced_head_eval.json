@@ -1,0 +1,33 @@
+{
+  "model": "gemma-4-e4b",
+  "evaluated_at": "2026-10-31 03:36:41",
+  "mathematical_equivalence": {
+    "all_match": true,
+    "max_margin_diff": 0.0,
+    "choice_match": true,
+    "score_match": true
+  },
+  "latency_benchmark": [
+    {
+      "name": "短 Prompt (~60 tokens)",
+      "orig_ms": 86.24,
+      "opt_ms": 77.59,
+      "saved_ms": 8.65,
+      "speedup_pct": 10.0
+    },
+    {
+      "name": "中等 Prompt (~350 tokens)",
+      "orig_ms": 141.04,
+      "opt_ms": 123.45,
+      "saved_ms": 17.59,
+      "speedup_pct": 12.5
+    },
+    {
+      "name": "长 Prompt (~1200 tokens)",
+      "orig_ms": 1198.63,
+      "opt_ms": 1025.09,
+      "saved_ms": 173.54,
+      "speedup_pct": 14.5
+    }
+  ]
+}

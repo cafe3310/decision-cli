@@ -701,6 +701,7 @@ type WorkerScoreItem struct {
 	Choices     []types.ChoiceOption `json:"choices,omitempty"`
 	ScoreLevels []string             `json:"score_levels,omitempty"`
 	DebiasOrder *bool                `json:"debias_order,omitempty"`
+	SlicedHead  *bool                `json:"sliced_head,omitempty"`
 }
 
 // WorkerScoreResult is the raw logit result returned by mlx_worker.py for one item.
@@ -721,6 +722,34 @@ type WorkerMultiParams struct {
 	ScoreLevels []string             `json:"score_levels,omitempty"`
 	DebiasOrder bool                 `json:"debias_order,omitempty"`
 	ImageTokens int                  `json:"image_tokens,omitempty"`
+	SlicedHead  string               `json:"sliced_head,omitempty"` // "on" | "off" | "" (default "on")
+}
+
+// DefaultSlicedHeadMode returns the default mode ("on" or "off") taking DECISION_SLICED_HEAD into account.
+func DefaultSlicedHeadMode() string {
+	raw := strings.TrimSpace(strings.ToLower(os.Getenv("DECISION_SLICED_HEAD")))
+	switch raw {
+	case "off", "false", "0", "no":
+		return "off"
+	default:
+		return "on"
+	}
+}
+
+// ParseSlicedHeadMode parses "on"/"off" (or boolean strings) into a boolean flag. Empty string falls back to DefaultSlicedHeadMode().
+func ParseSlicedHeadMode(raw string) (bool, error) {
+	s := strings.TrimSpace(strings.ToLower(raw))
+	if s == "" {
+		s = DefaultSlicedHeadMode()
+	}
+	switch s {
+	case "on", "true", "1", "yes":
+		return true, nil
+	case "off", "false", "0", "no":
+		return false, nil
+	default:
+		return false, fmt.Errorf("无效的 --sliced-head 参数值 %q（可选值：on | off）", raw)
+	}
 }
 
 // ScoreResponse is the JSON envelope returned by mlx_worker.py.
@@ -949,6 +978,10 @@ func ScoreMultiStreamingViaMLX(
 	if prim == "" {
 		prim = "noul"
 	}
+	useSliced, err := ParseSlicedHeadMode(params.SlicedHead)
+	if err != nil {
+		return nil, err
+	}
 
 	buildReq := func(stream bool) map[string]any {
 		m := map[string]any{
@@ -960,6 +993,7 @@ func ScoreMultiStreamingViaMLX(
 			"positive_tokens": model.Spec.PositiveTokens,
 			"negative_tokens": model.Spec.NegativeTokens,
 			"debias_order":    params.DebiasOrder,
+			"sliced_head":     useSliced,
 			"items":           items,
 		}
 		if stream {

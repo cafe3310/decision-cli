@@ -716,8 +716,69 @@ class ModelArbiter:
                     pass
 
 
+
 ARBITER = ModelArbiter()
 
+
+def compute_sliced_logits(proj_layer, h_last, candidate_ids: list[int], softcap=None):
+    """
+    Computes logits specifically for candidate_ids from the last token hidden state h_last.
+    h_last: mx.array of shape [1, 1, hidden_dim] or [1, hidden_dim]
+    """
+    c_arr = mx.array(candidate_ids, dtype=mx.int32)
+    # Check if quantized layer (QuantizedEmbedding or QuantizedLinear)
+    if hasattr(proj_layer, "group_size") and "weight" in proj_layer:
+        w_sub = proj_layer["weight"][c_arr]
+        s_sub = proj_layer["scales"][c_arr]
+        b_sub = proj_layer.get("biases")
+        if b_sub is not None:
+            b_sub = b_sub[c_arr]
+        logits = mx.quantized_matmul(
+            h_last,
+            w_sub,
+            scales=s_sub,
+            biases=b_sub,
+            transpose=True,
+            group_size=proj_layer.group_size,
+            bits=proj_layer.bits,
+            mode=proj_layer.mode,
+        )
+        if "bias" in proj_layer and proj_layer["bias"] is not None:
+            logits = logits + proj_layer["bias"][c_arr]
+    elif hasattr(proj_layer, "weight"):
+        # Standard unquantized layer
+        w_sub = proj_layer.weight[c_arr]
+        logits = mx.matmul(h_last, w_sub.T)
+        if getattr(proj_layer, "bias", None) is not None:
+            logits = logits + proj_layer.bias[c_arr]
+    else:
+        # Fallback to full projection then slice if custom layer
+        full = proj_layer(h_last)
+        logits = full[..., c_arr]
+
+    if softcap is not None:
+        logits = softcap * mx.tanh(logits / softcap)
+
+    return logits.reshape(-1).astype(mx.float32)
+
+
+def get_lm_projection_layer(lm):
+    """Resolve the projection layer (tied embedding or lm_head) for a causal language model."""
+    tie = getattr(lm, "tie_word_embeddings", None)
+    if tie is None and hasattr(lm, "args"):
+        tie = getattr(lm.args, "tie_word_embeddings", False)
+
+    if tie:
+        if hasattr(lm, "model") and hasattr(lm.model, "embed_tokens"):
+            return lm.model.embed_tokens
+        if hasattr(lm, "embed_tokens"):
+            return lm.embed_tokens
+    head = getattr(lm, "lm_head", None) or (lm.get("lm_head") if hasattr(lm, "get") else None)
+    if head is not None:
+        return head
+    if hasattr(lm, "model") and hasattr(lm.model, "embed_tokens"):
+        return lm.model.embed_tokens
+    return None
 
 
 def forward_last_logits(model, input_ids: list[int], ordered_img_embs: list[mx.array] | None = None):
@@ -772,6 +833,90 @@ def forward_last_logits(model, input_ids: list[int], ordered_img_embs: list[mx.a
     return log_probs
 
 
+def parse_sliced_head_flag(val, default: bool = True) -> bool:
+    if val is None:
+        return default
+    if isinstance(val, bool):
+        return val
+    s = str(val).strip().lower()
+    if s in ("on", "true", "1", "yes"):
+        return True
+    if s in ("off", "false", "0", "no"):
+        return False
+    return default
+
+
+def forward_candidate_logits(
+    model,
+    input_ids: list[int],
+    candidate_ids: list[int],
+    ordered_img_embs: list[mx.array] | None = None,
+    sliced_head: bool = True,
+) -> dict[int, float]:
+    """
+    Returns a mapping of {token_id: unnormalized_or_normalized_logit} for candidate_ids.
+    When sliced_head is True, computes only the projection for candidate_ids at position -1.
+    When sliced_head is False, falls back to full vocabulary forward_last_logits.
+    """
+    if not sliced_head or not candidate_ids:
+        log_probs = forward_last_logits(model, input_ids, ordered_img_embs)
+        return {cid: float(log_probs[cid].item()) for cid in candidate_ids}
+
+    lm = model.language_model if hasattr(model, "language_model") else model
+    proj = get_lm_projection_layer(lm)
+    if proj is None or not hasattr(lm, "model"):
+        log_probs = forward_last_logits(model, input_ids, ordered_img_embs)
+        return {cid: float(log_probs[cid].item()) for cid in candidate_ids}
+
+    try:
+        if not ordered_img_embs:
+            x = mx.array([input_ids], dtype=mx.int32)
+            h = lm.model(x)
+        else:
+            ids_np = np.array(input_ids, dtype=np.int32)
+            mask = ids_np == GEMMA4_IMG_TOKEN_ID
+            llm_ids = mx.array(np.where(mask, 0, ids_np)[None, :])
+            text_embeds = lm.model.embed_tokens(llm_ids)
+            embed_scale = float(getattr(lm.model, "embed_scale", 1.0))
+
+            padded = np.concatenate(([False], mask, [False]))
+            starts = np.flatnonzero(padded[1:] & ~padded[:-1])
+            ends = np.flatnonzero(~padded[1:] & padded[:-1])
+
+            if len(starts) != len(ordered_img_embs):
+                raise ValueError(
+                    f"Mismatch between image token spans ({len(starts)}) and encoded images ({len(ordered_img_embs)})"
+                )
+
+            segments = []
+            prev = 0
+            for (s, e), emb in zip(zip(starts, ends), ordered_img_embs):
+                s_i, e_i = int(s), int(e)
+                if s_i > prev:
+                    segments.append(text_embeds[:, prev:s_i, :])
+                scaled_img = (emb / embed_scale).astype(text_embeds.dtype)[None, :, :]
+                segments.append(scaled_img)
+                prev = e_i
+            if prev < len(input_ids):
+                segments.append(text_embeds[:, prev:, :])
+
+            merged_embeds = mx.concatenate(segments, axis=1)
+            h = lm.model(inputs=llm_ids, input_embeddings=merged_embeds)
+
+        if isinstance(h, tuple):
+            h = h[0]
+
+        h_last = h[:, -1:, :]
+        softcap = getattr(lm, "final_logit_softcapping", None)
+        sliced = compute_sliced_logits(proj, h_last, candidate_ids, softcap)
+        mx.eval(sliced)
+        return {cid: float(sliced[i].item()) for i, cid in enumerate(candidate_ids)}
+    except Exception:
+        log_probs = forward_last_logits(model, input_ids, ordered_img_embs)
+        return {cid: float(log_probs[cid].item()) for cid in candidate_ids}
+
+
+
 def prepare_item_multimodal(
     model_path: str,
     rubrics: str,
@@ -804,6 +949,7 @@ def score_single_item(
     pos_ids: list,
     neg_ids: list,
     item: dict,
+    default_sliced_head: bool = True,
 ) -> dict:
     t0 = time.perf_counter()
     item_id = item.get("id", "")
@@ -817,6 +963,7 @@ def score_single_item(
         if "debias_order" in item and item["debias_order"] is not None
         else default_debias
     )
+    use_sliced = parse_sliced_head_flag(item.get("sliced_head"), default_sliced_head)
 
     rubrics_m, context_m, ordered_embs = prepare_item_multimodal(
         model_path, rubrics, context, images, image_tokens
@@ -829,17 +976,18 @@ def score_single_item(
         if k_count < 2 or k_count > len(TAG_POOL):
             raise ValueError(f"choice primitive requires 2..{len(TAG_POOL)} options, got {k_count}")
         tag_token_ids = [resolve_candidate_token_ids(tokenizer, [TAG_POOL[i]]) for i in range(k_count)]
+        all_cands = sorted(list(set(tid for tids in tag_token_ids for tid in tids)))
 
         def run_choice_pass(ordered_choices: list) -> dict:
             prompt = build_choice_prompt(
                 tokenizer, prompt_style, rubrics_m, ordered_choices, context_m, has_images=has_images
             )
             input_ids = tokenizer.encode(prompt, add_special_tokens=False) if has_images else tokenizer.encode(prompt)
-            log_probs = forward_last_logits(model, input_ids, ordered_embs)
+            cand_logits = forward_candidate_logits(model, input_ids, all_cands, ordered_embs, sliced_head=use_sliced)
             raw_vals = {}
             for idx, c in enumerate(ordered_choices):
                 tids = tag_token_ids[idx]
-                raw_vals[c["key"]] = logsumexp([float(log_probs[tid].item()) for tid in tids])
+                raw_vals[c["key"]] = logsumexp([cand_logits[tid] for tid in tids])
             sub_lse = logsumexp(list(raw_vals.values()))
             return {k: v - sub_lse for k, v in raw_vals.items()}
 
@@ -866,6 +1014,7 @@ def score_single_item(
         if m_count < 2 or m_count > 10:
             raise ValueError(f"score primitive requires 2..10 ordinal levels, got {m_count}")
         digit_token_ids = [resolve_candidate_token_ids(tokenizer, [str(m)]) for m in range(m_count)]
+        all_cands = sorted(list(set(tid for tids in digit_token_ids for tid in tids)))
         indexed_levels = list(enumerate(score_levels))
 
         def run_score_pass(ordered_pairs: list) -> dict:
@@ -873,11 +1022,11 @@ def score_single_item(
                 tokenizer, prompt_style, rubrics_m, ordered_pairs, context_m, has_images=has_images
             )
             input_ids = tokenizer.encode(prompt, add_special_tokens=False) if has_images else tokenizer.encode(prompt)
-            log_probs = forward_last_logits(model, input_ids, ordered_embs)
+            cand_logits = forward_candidate_logits(model, input_ids, all_cands, ordered_embs, sliced_head=use_sliced)
             raw_vals = {}
             for display_idx, (orig_idx, _) in enumerate(ordered_pairs):
                 tids = digit_token_ids[display_idx]
-                raw_vals[str(orig_idx)] = logsumexp([float(log_probs[tid].item()) for tid in tids])
+                raw_vals[str(orig_idx)] = logsumexp([cand_logits[tid] for tid in tids])
             sub_lse = logsumexp(list(raw_vals.values()))
             return {k: v - sub_lse for k, v in raw_vals.items()}
 
@@ -899,11 +1048,12 @@ def score_single_item(
         }
 
     else:
+        all_cands = sorted(list(set(pos_ids + neg_ids)))
         prompt = build_prompt(tokenizer, prompt_style, rubrics_m, context_m, has_images=has_images)
         input_ids = tokenizer.encode(prompt, add_special_tokens=False) if has_images else tokenizer.encode(prompt)
-        log_probs = forward_last_logits(model, input_ids, ordered_embs)
-        pos_vals = [float(log_probs[idx].item()) for idx in pos_ids]
-        neg_vals = [float(log_probs[idx].item()) for idx in neg_ids]
+        cand_logits = forward_candidate_logits(model, input_ids, all_cands, ordered_embs, sliced_head=use_sliced)
+        pos_vals = [cand_logits[idx] for idx in pos_ids]
+        neg_vals = [cand_logits[idx] for idx in neg_ids]
         logit_yes = logsumexp(pos_vals)
         logit_no = logsumexp(neg_vals)
         latency_ms = (time.perf_counter() - t0) * 1000.0
@@ -931,10 +1081,14 @@ def score_items_with_shared_prefix(
     neg_ids: list,
     items: list,
     stream_stdout: bool = False,
+    default_sliced_head: bool = True,
 ) -> list:
     from mlx_lm.models.cache import make_prompt_cache
 
     lm = model.language_model if hasattr(model, "language_model") else model
+    proj = get_lm_projection_layer(lm)
+    softcap = getattr(lm, "final_logit_softcapping", None)
+
     common_context = items[0].get("context", "")
     prefix_prompt = f"<bos><start_of_turn>user\n【待评估背景材料 (Context)】\n{common_context}\n\n"
     prefix_ids = tokenizer.encode(prefix_prompt, add_special_tokens=False)
@@ -950,6 +1104,7 @@ def score_items_with_shared_prefix(
         prim = item.get("primitive") or default_prim
         rubrics = item.get("rubrics") or default_rubrics
         debias = item.get("debias_order") if "debias_order" in item else default_debias
+        use_sliced = parse_sliced_head_flag(item.get("sliced_head"), default_sliced_head)
 
         if prim == "choice":
             choices = item.get("choices") or default_choices
@@ -969,12 +1124,20 @@ def score_items_with_shared_prefix(
                 )
                 suffix_ids = tokenizer.encode(suffix, add_special_tokens=False)
                 b_cache = [type(c).from_state(c.state) for c in base_cache]
-                out = lm(mx.array([suffix_ids]), cache=b_cache)[0, -1, :]
-                lp = out - mx.logsumexp(out)
+                all_cands = sorted(list(set(tid for idx in range(len(ordered)) for tid in resolve_candidate_token_ids(tokenizer, [TAG_POOL[idx]]))))
+                if use_sliced and proj is not None and hasattr(lm, "model"):
+                    h = lm.model(mx.array([suffix_ids]), cache=b_cache)[:, -1:, :]
+                    sliced = compute_sliced_logits(proj, h, all_cands, softcap)
+                    mx.eval(sliced)
+                    cand_map = {cid: float(sliced[i].item()) for i, cid in enumerate(all_cands)}
+                else:
+                    out = lm(mx.array([suffix_ids]), cache=b_cache)[0, -1, :]
+                    lp = out - mx.logsumexp(out)
+                    cand_map = {cid: float(lp[cid].item()) for cid in all_cands}
                 vals = {}
                 for idx, c in enumerate(ordered):
                     tids = resolve_candidate_token_ids(tokenizer, [TAG_POOL[idx]])
-                    vals[str(c.get("key", ""))] = logsumexp([float(lp[tid].item()) for tid in tids])
+                    vals[str(c.get("key", ""))] = logsumexp([cand_map[tid] for tid in tids])
                 sub_lse = logsumexp(list(vals.values()))
                 return {k: v - sub_lse for k, v in vals.items()}
 
@@ -1000,10 +1163,18 @@ def score_items_with_shared_prefix(
             )
             suffix_ids = tokenizer.encode(suffix, add_special_tokens=False)
             b_cache = [type(c).from_state(c.state) for c in base_cache]
-            out = lm(mx.array([suffix_ids]), cache=b_cache)[0, -1, :]
-            log_probs = out - mx.logsumexp(out)
-            pos_vals = [float(log_probs[idx].item()) for idx in pos_ids]
-            neg_vals = [float(log_probs[idx].item()) for idx in neg_ids]
+            all_cands = sorted(list(set(pos_ids + neg_ids)))
+            if use_sliced and proj is not None and hasattr(lm, "model"):
+                h = lm.model(mx.array([suffix_ids]), cache=b_cache)[:, -1:, :]
+                sliced = compute_sliced_logits(proj, h, all_cands, softcap)
+                mx.eval(sliced)
+                cand_map = {cid: float(sliced[i].item()) for i, cid in enumerate(all_cands)}
+            else:
+                out = lm(mx.array([suffix_ids]), cache=b_cache)[0, -1, :]
+                log_probs = out - mx.logsumexp(out)
+                cand_map = {cid: float(log_probs[cid].item()) for cid in all_cands}
+            pos_vals = [cand_map[idx] for idx in pos_ids]
+            neg_vals = [cand_map[idx] for idx in neg_ids]
             l_yes = logsumexp(pos_vals)
             l_no = logsumexp(neg_vals)
             res_obj = {
@@ -1023,6 +1194,7 @@ def score_items_with_shared_prefix(
     return results
 
 
+
 def handle_score_request(req: dict, stream_stdout: bool = False, on_item_cb = None) -> dict:
     model_path = req["model_path"]
     prompt_style = req.get("prompt_style", "gemma4-binary")
@@ -1032,6 +1204,8 @@ def handle_score_request(req: dict, stream_stdout: bool = False, on_item_cb = No
     default_levels = req.get("score_levels", [])
     default_debias = bool(req.get("debias_order", False))
     default_image_tokens = int(req.get("image_tokens") or 280)
+    env_default = parse_sliced_head_flag(os.environ.get("DECISION_SLICED_HEAD"), True)
+    default_sliced_head = parse_sliced_head_flag(req.get("sliced_head"), env_default)
     items = req.get("items", [])
 
     # Acquire model lock & queue depth via ModelArbiter (waits if different model is running)
@@ -1085,6 +1259,7 @@ def handle_score_request(req: dict, stream_stdout: bool = False, on_item_cb = No
                     neg_ids,
                     items,
                     stream_stdout=stream_stdout,
+                    default_sliced_head=default_sliced_head,
                 )
                 for res_obj in shared_results:
                     ARBITER.record_decision(res_obj.get("latency_ms", 0.0))
@@ -1120,6 +1295,7 @@ def handle_score_request(req: dict, stream_stdout: bool = False, on_item_cb = No
                 pos_ids,
                 neg_ids,
                 item,
+                default_sliced_head=default_sliced_head,
             )
             ARBITER.record_decision(res_obj.get("latency_ms", 0.0))
             completed_items += 1

@@ -1,0 +1,66 @@
+{
+  "text": [
+    {
+      "model": "ling-3.0-tiny",
+      "decision_orig": "是",
+      "decision_opt": "是",
+      "margin_diff": 0.0,
+      "lat_orig_ms": 89.48,
+      "lat_opt_ms": 113.13,
+      "lat_saved_ms": -23.65,
+      "speedup_pct": -26.4
+    },
+    {
+      "model": "qwen3-reranker-4b",
+      "decision_orig": "否",
+      "decision_opt": "否",
+      "margin_diff": 0.00010000000000021103,
+      "lat_orig_ms": 125.35,
+      "lat_opt_ms": 107.44,
+      "lat_saved_ms": 17.92,
+      "speedup_pct": 14.3
+    },
+    {
+      "model": "gemma-4-e4b",
+      "decision_orig": "是",
+      "decision_opt": "是",
+      "margin_diff": 0.0,
+      "lat_orig_ms": 92.76,
+      "lat_opt_ms": 83.61,
+      "lat_saved_ms": 9.16,
+      "speedup_pct": 9.9
+    },
+    {
+      "model": "gemma-4-26b-a4b",
+      "decision_orig": "是",
+      "decision_opt": "是",
+      "margin_diff": 0.007800000000001361,
+      "lat_orig_ms": 128.45,
+      "lat_opt_ms": 123.21,
+      "lat_saved_ms": 5.24,
+      "speedup_pct": 4.1
+    }
+  ],
+  "multimodal": [
+    {
+      "model": "gemma-4-e4b",
+      "decision_orig": "是",
+      "decision_opt": "是",
+      "margin_diff": 0.0,
+      "lat_orig_ms": 209.24,
+      "lat_opt_ms": 190.25,
+      "lat_saved_ms": 18.99,
+      "speedup_pct": 9.1
+    },
+    {
+      "model": "gemma-4-26b-a4b",
+      "decision_orig": "否",
+      "decision_opt": "否",
+      "margin_diff": 0.0,
+      "lat_orig_ms": 247.2,
+      "lat_opt_ms": 218.07,
+      "lat_saved_ms": 29.13,
+      "speedup_pct": 11.8
+    }
+  ]
+}

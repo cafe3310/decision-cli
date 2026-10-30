@@ -33,6 +33,7 @@ type Options struct {
 	FilterPassed   bool
 	IncludeRecord  bool
 	StreamProgress bool
+	SlicedHead     string // "on" | "off" | "" (default "on")
 }
 
 func validateVisionModelSupport(rm infra.ResolvedModel, images []string) error {
@@ -163,6 +164,9 @@ func roundLogitsMap(m map[string]float64) map[string]float64 {
 // EvaluateSingleChoice evaluates a single multi-class choice decision with SQLite caching and MLX fallback.
 func EvaluateSingleChoice(cfg *types.AppConfig, store *cache.Store, opts Options, contextText string) (*types.SingleChoiceResult, error) {
 	t0 := time.Now()
+	if _, err := infra.ParseSlicedHeadMode(opts.SlicedHead); err != nil {
+		return nil, err
+	}
 	rm, modelErr := infra.ResolveModel(cfg, opts.ModelName)
 	if err := validateVisionModelSupport(rm, opts.Images); err != nil {
 		return nil, err
@@ -221,6 +225,7 @@ func EvaluateSingleChoice(cfg *types.AppConfig, store *cache.Store, opts Options
 		Choices:     opts.Choices,
 		DebiasOrder: opts.DebiasOrder,
 		ImageTokens: normImgTokens,
+		SlicedHead:  opts.SlicedHead,
 	}, []infra.WorkerScoreItem{
 		{ID: "single", Context: contextText, Images: resolvedImages, ImageTokens: normImgTokens},
 	})
@@ -280,6 +285,9 @@ func EvaluateSingleChoice(cfg *types.AppConfig, store *cache.Store, opts Options
 // EvaluateSingleScore evaluates a single ordinal score decision with SQLite caching and MLX fallback.
 func EvaluateSingleScore(cfg *types.AppConfig, store *cache.Store, opts Options, contextText string) (*types.SingleScoreResult, error) {
 	t0 := time.Now()
+	if _, err := infra.ParseSlicedHeadMode(opts.SlicedHead); err != nil {
+		return nil, err
+	}
 	rm, modelErr := infra.ResolveModel(cfg, opts.ModelName)
 	if err := validateVisionModelSupport(rm, opts.Images); err != nil {
 		return nil, err
@@ -342,6 +350,7 @@ func EvaluateSingleScore(cfg *types.AppConfig, store *cache.Store, opts Options,
 		ScoreLevels: opts.ScoreLevels,
 		DebiasOrder: opts.DebiasOrder,
 		ImageTokens: normImgTokens,
+		SlicedHead:  opts.SlicedHead,
 	}, []infra.WorkerScoreItem{
 		{ID: "single", Context: contextText, Images: resolvedImages, ImageTokens: normImgTokens},
 	})
@@ -423,6 +432,9 @@ func CalibrateDecision(logitYes, logitNo float64, opts Options) (prob, conf floa
 // EvaluateSingle evaluates a single (rubrics, context) pair with SQLite caching and MLX fallback.
 func EvaluateSingle(cfg *types.AppConfig, store *cache.Store, opts Options, contextText string) (*types.SingleDecisionResult, error) {
 	t0 := time.Now()
+	if _, err := infra.ParseSlicedHeadMode(opts.SlicedHead); err != nil {
+		return nil, err
+	}
 	rm, modelErr := infra.ResolveModel(cfg, opts.ModelName)
 	if err := validateVisionModelSupport(rm, opts.Images); err != nil {
 		return nil, err
@@ -481,6 +493,7 @@ func EvaluateSingle(cfg *types.AppConfig, store *cache.Store, opts Options, cont
 		Primitive:   "noul",
 		Rubrics:     opts.Rubrics,
 		ImageTokens: normImgTokens,
+		SlicedHead:  opts.SlicedHead,
 	}, []infra.WorkerScoreItem{
 		{ID: "single", Context: contextText, Images: resolvedImages, ImageTokens: normImgTokens},
 	})
@@ -547,6 +560,9 @@ func EvaluateSingle(cfg *types.AppConfig, store *cache.Store, opts Options, cont
 // consulting SQLite cache first and dispatching only cache misses to the MLX worker in a single model load.
 func EvaluateBatch(cfg *types.AppConfig, store *cache.Store, opts Options, items []types.BatchItemInput) (*types.BatchDecisionReport, error) {
 	t0 := time.Now()
+	if _, err := infra.ParseSlicedHeadMode(opts.SlicedHead); err != nil {
+		return nil, err
+	}
 	infra.EnsureStatusBarRunning()
 	prim := opts.Primitive
 	if prim == "" {
@@ -777,6 +793,7 @@ func EvaluateBatch(cfg *types.AppConfig, store *cache.Store, opts Options, items
 			ScoreLevels: opts.ScoreLevels,
 			DebiasOrder: opts.DebiasOrder,
 			ImageTokens: normImgTokens,
+			SlicedHead:  opts.SlicedHead,
 		}, missWorkerItems, onStatus, onItem)
 		if err != nil {
 			return nil, err
@@ -861,6 +878,9 @@ func EvaluateBatch(cfg *types.AppConfig, store *cache.Store, opts Options, items
 // against a shared state context, batching all cache-miss questions into a single MLX model pass.
 func EvaluateSystemOne(cfg *types.AppConfig, store *cache.Store, baseOpts Options, req *types.SystemOneRequest, flagTemp float64, flagTempChanged bool) (*types.SystemOneResponse, error) {
 	t0 := time.Now()
+	if _, err := infra.ParseSlicedHeadMode(baseOpts.SlicedHead); err != nil {
+		return nil, err
+	}
 	modelName := baseOpts.ModelName
 	if modelName == "" && req.Model != "" && !strings.HasPrefix(strings.ToLower(req.Model), "jev") {
 		modelName = req.Model
@@ -1042,6 +1062,7 @@ func EvaluateSystemOne(cfg *types.AppConfig, store *cache.Store, baseOpts Option
 			Primitive:   "noul",
 			DebiasOrder: baseOpts.DebiasOrder,
 			ImageTokens: normSysImgTokens,
+			SlicedHead:  baseOpts.SlicedHead,
 		}, missWorkerItems)
 		if err != nil {
 			return nil, err

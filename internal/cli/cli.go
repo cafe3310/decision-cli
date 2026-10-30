@@ -179,6 +179,7 @@ func newNounCommand(rootFlags *RootFlags) *cobra.Command {
 		output      string
 		noCache     bool
 		cacheOnly   bool
+		slicedHead  string
 	)
 
 	cmd := &cobra.Command{
@@ -252,6 +253,7 @@ func newNounCommand(rootFlags *RootFlags) *cobra.Command {
 				CalibB:      ptrB,
 				NoCache:     noCache,
 				CacheOnly:   cacheOnly,
+				SlicedHead:  slicedHead,
 			}
 
 			res, err := engine.EvaluateSingle(cfg, store, opts, context)
@@ -275,6 +277,7 @@ func newNounCommand(rootFlags *RootFlags) *cobra.Command {
 	cmd.Flags().StringVar(&output, "output", "", "结果保存文件路径（缺省输出至 stdout）")
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "跳过 SQLite 本地缓存读取与写入")
 	cmd.Flags().BoolVar(&cacheOnly, "cache-only", false, "仅查本地缓存，不拉起模型推理")
+	cmd.Flags().StringVar(&slicedHead, "sliced-head", infra.DefaultSlicedHeadMode(), "末层候选 Token 投影切片优化开关：on | off（默认 on）")
 
 	return cmd
 }
@@ -293,6 +296,7 @@ func newChooseCommand(rootFlags *RootFlags) *cobra.Command {
 		output      string
 		noCache     bool
 		cacheOnly   bool
+		slicedHead  string
 	)
 
 	cmd := &cobra.Command{
@@ -372,6 +376,7 @@ func newChooseCommand(rootFlags *RootFlags) *cobra.Command {
 				Temperature: effTemp,
 				NoCache:     noCache,
 				CacheOnly:   cacheOnly,
+				SlicedHead:  slicedHead,
 			}
 
 			res, err := engine.EvaluateSingleChoice(cfg, store, opts, context)
@@ -394,6 +399,7 @@ func newChooseCommand(rootFlags *RootFlags) *cobra.Command {
 	cmd.Flags().StringVar(&output, "output", "", "结果保存文件路径（缺省输出至 stdout）")
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "跳过 SQLite 本地缓存读取与写入")
 	cmd.Flags().BoolVar(&cacheOnly, "cache-only", false, "仅查本地缓存，不拉起模型推理")
+	cmd.Flags().StringVar(&slicedHead, "sliced-head", infra.DefaultSlicedHeadMode(), "末层候选 Token 投影切片优化开关：on | off（默认 on）")
 
 	return cmd
 }
@@ -412,6 +418,7 @@ func newScoreCommand(rootFlags *RootFlags) *cobra.Command {
 		output      string
 		noCache     bool
 		cacheOnly   bool
+		slicedHead  string
 	)
 
 	cmd := &cobra.Command{
@@ -482,6 +489,7 @@ func newScoreCommand(rootFlags *RootFlags) *cobra.Command {
 				Temperature: effTemp,
 				NoCache:     noCache,
 				CacheOnly:   cacheOnly,
+				SlicedHead:  slicedHead,
 			}
 
 			res, err := engine.EvaluateSingleScore(cfg, store, opts, context)
@@ -504,6 +512,7 @@ func newScoreCommand(rootFlags *RootFlags) *cobra.Command {
 	cmd.Flags().StringVar(&output, "output", "", "结果保存文件路径（缺省输出至 stdout）")
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "跳过 SQLite 本地缓存读取与写入")
 	cmd.Flags().BoolVar(&cacheOnly, "cache-only", false, "仅查本地缓存，不拉起模型推理")
+	cmd.Flags().StringVar(&slicedHead, "sliced-head", infra.DefaultSlicedHeadMode(), "末层候选 Token 投影切片优化开关：on | off（默认 on）")
 
 	return cmd
 }
@@ -552,6 +561,7 @@ func newBatchNounCommand(rootFlags *RootFlags) *cobra.Command {
 		progress        bool
 		noCache         bool
 		cacheOnly       bool
+		slicedHead      string
 	)
 
 	cmd := &cobra.Command{
@@ -624,6 +634,7 @@ func newBatchNounCommand(rootFlags *RootFlags) *cobra.Command {
 				FilterPassed:   filterPassed,
 				IncludeRecord:  includeRecord,
 				StreamProgress: progress,
+				SlicedHead:     slicedHead,
 			}
 
 			items, err := exporter.LoadBatchItemsWithImages(input, idField, contextTemplate, imageField, imageBaseDir)
@@ -657,6 +668,7 @@ func newBatchNounCommand(rootFlags *RootFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&progress, "progress", false, "在 stderr 实时流式打印 JSONL 处理进度")
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "跳过 SQLite 本地缓存读取与写入")
 	cmd.Flags().BoolVar(&cacheOnly, "cache-only", false, "仅查本地缓存，不拉起模型推理")
+	cmd.Flags().StringVar(&slicedHead, "sliced-head", infra.DefaultSlicedHeadMode(), "末层候选 Token 投影切片优化开关：on | off（默认 on）")
 
 	return cmd
 }
@@ -680,6 +692,7 @@ func newBatchChooseCommand(rootFlags *RootFlags) *cobra.Command {
 		progress        bool
 		noCache         bool
 		cacheOnly       bool
+		slicedHead      string
 	)
 
 	cmd := &cobra.Command{
@@ -743,6 +756,7 @@ func newBatchChooseCommand(rootFlags *RootFlags) *cobra.Command {
 				CacheOnly:      cacheOnly,
 				IncludeRecord:  includeRecord,
 				StreamProgress: progress,
+				SlicedHead:     slicedHead,
 			}
 
 			items, err := exporter.LoadBatchItemsWithImages(input, idField, contextTemplate, imageField, imageBaseDir)
@@ -774,6 +788,7 @@ func newBatchChooseCommand(rootFlags *RootFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&progress, "progress", false, "在 stderr 实时流式打印 JSONL 处理进度")
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "跳过 SQLite 本地缓存读取与写入")
 	cmd.Flags().BoolVar(&cacheOnly, "cache-only", false, "仅查本地缓存，不拉起模型推理")
+	cmd.Flags().StringVar(&slicedHead, "sliced-head", infra.DefaultSlicedHeadMode(), "末层候选 Token 投影切片优化开关：on | off（默认 on）")
 
 	return cmd
 }
@@ -797,6 +812,7 @@ func newBatchScoreCommand(rootFlags *RootFlags) *cobra.Command {
 		progress        bool
 		noCache         bool
 		cacheOnly       bool
+		slicedHead      string
 	)
 
 	cmd := &cobra.Command{
@@ -861,6 +877,7 @@ func newBatchScoreCommand(rootFlags *RootFlags) *cobra.Command {
 				CacheOnly:      cacheOnly,
 				IncludeRecord:  includeRecord,
 				StreamProgress: progress,
+				SlicedHead:     slicedHead,
 			}
 
 			items, err := exporter.LoadBatchItemsWithImages(input, idField, contextTemplate, imageField, imageBaseDir)
@@ -892,6 +909,7 @@ func newBatchScoreCommand(rootFlags *RootFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&progress, "progress", false, "在 stderr 实时流式打印 JSONL 处理进度")
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "跳过 SQLite 本地缓存读取与写入")
 	cmd.Flags().BoolVar(&cacheOnly, "cache-only", false, "仅查本地缓存，不拉起模型推理")
+	cmd.Flags().StringVar(&slicedHead, "sliced-head", infra.DefaultSlicedHeadMode(), "末层候选 Token 投影切片优化开关：on | off（默认 on）")
 
 	return cmd
 }
@@ -914,6 +932,7 @@ func newSystemOneCommand(rootFlags *RootFlags) *cobra.Command {
 		debiasOrder     bool
 		noCache         bool
 		cacheOnly       bool
+		slicedHead      string
 	)
 
 	cmd := &cobra.Command{
@@ -966,6 +985,7 @@ func newSystemOneCommand(rootFlags *RootFlags) *cobra.Command {
 				CalibB:      ptrB,
 				NoCache:     noCache,
 				CacheOnly:   cacheOnly,
+				SlicedHead:  slicedHead,
 			}
 			resp, err := engine.EvaluateSystemOne(cfg, store, baseOpts, req, temperature, cmd.Flags().Changed("temperature"))
 			if err != nil {
@@ -987,6 +1007,7 @@ func newSystemOneCommand(rootFlags *RootFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&debiasOrder, "debias-order", false, "对 choice 与 score 题目执行正反序双向去偏置")
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "跳过 SQLite 本地缓存读取与写入")
 	cmd.Flags().BoolVar(&cacheOnly, "cache-only", false, "仅查本地缓存，不拉起模型推理")
+	cmd.Flags().StringVar(&slicedHead, "sliced-head", infra.DefaultSlicedHeadMode(), "末层候选 Token 投影切片优化开关：on | off（默认 on）")
 
 	return cmd
 }
